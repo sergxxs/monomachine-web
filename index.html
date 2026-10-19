@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-mono-build="5.3.1">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -10,9 +10,127 @@
 <meta name="format-detection" content="telephone=no">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="theme-color" content="#2a2723">
-<title>MONOMACHINE SFX-60 — browser synth for iPhone</title>
+<title>MONOMACHINE SFX-60 — browser synth for iPhone, iPad and desktop</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23d8d5cc'/%3E%3Crect x='14' y='8' width='36' height='30' fill='%23000'/%3E%3Crect x='18' y='20' width='16' height='11' fill='%23a8c0a0'/%3E%3Ccircle cx='42' cy='18' r='4' fill='%23111'/%3E%3Ccircle cx='42' cy='29' r='4' fill='%23111'/%3E%3Crect x='6' y='46' width='52' height='9' rx='2' fill='%23111'/%3E%3C/svg%3E">
+<script>
+/* MONOMACHINE boot guard: deliberately tiny/ES5-ish. It runs before the app,
+   classifies the device, captures script failures and can retry a missing
+   external module. The full app sets __monoBoot.ok when the panel is live. */
+(function(){
+  var boot={t0:Date.now(),ok:false,stage:'guard',errors:[],retried:false,build:'5.3.1'};
+  window.__monoBoot=boot;
+  function clean(v){ return String(v==null?'':v).replace(/\s+/g,' ').slice(0,260); }
+  window.__monoBootError=function(where,e){
+    var msg=clean(where)+': '+clean(e&&(e.stack||e.message||e));
+    if(boot.errors.indexOf(msg)<0) boot.errors.push(msg);
+    boot.lastError=msg;
+  };
+  window.addEventListener('error',function(e){
+    var t=e&&e.target;
+    if(t&&(t.tagName==='SCRIPT'||t.tagName==='LINK')) window.__monoBootError('resource '+(t.src||t.href||t.tagName),'failed to load');
+    else if(e&&e.message) window.__monoBootError('window',e.message);
+  },true);
+  window.addEventListener('unhandledrejection',function(e){ window.__monoBootError('promise',e&&e.reason); });
+  function deviceClass(){
+    var vv=window.visualViewport;
+    var w=Math.round(vv?vv.width:(window.innerWidth||0)),h=Math.round(vv?vv.height:(window.innerHeight||0)),land=w>=h;
+    var coarse=false,fine=false;
+    try{ coarse=!!window.matchMedia('(pointer:coarse)').matches; fine=!!window.matchMedia('(pointer:fine)').matches; }catch(e){}
+    var shortSide=Math.min(w,h), longSide=Math.max(w,h), kind='desktop';
+    if(coarse&&shortSide<600&&longSide<1100) kind='phone';
+    else if(coarse||(shortSide>=600&&shortSide<1200&&longSide<1700)) kind='tablet';
+    if(fine&&w>=1100) kind='desktop';
+    var root=document.documentElement;
+    if(h>0) root.style.setProperty('--appH',h+'px');
+    root.setAttribute('data-mono-build',boot.build);
+    root.className=root.className.replace(/\bdev-(phone|tablet|desktop)\b/g,'').replace(/\bdev-(portrait|landscape)\b/g,'').replace(/\s+/g,' ').trim();
+    root.className=(root.className?root.className+' ':'')+'dev-'+kind+' dev-'+(land?'landscape':'portrait');
+    boot.device=kind+(land?' landscape':' portrait')+' '+w+'x'+h;
+  }
+  function loadScript(src,done){
+    var el=document.createElement('script');
+    el.src=src+(src.indexOf('?')<0?'?':'&')+'monoRetry='+Date.now();
+    el.onload=function(){ done(true); };
+    el.onerror=function(){ window.__monoBootError('retry '+src,'failed'); done(false); };
+    (document.body||document.documentElement).appendChild(el);
+  }
+  window.__monoLoadMissing=function(done){
+    if(boot.retried){ if(done)done(false); return; }
+    boot.retried=true;
+    var q=[];
+    if(typeof S==='undefined') q.push('js/state.js');
+    if(typeof sxParseFile==='undefined') q.push('js/sysex.js');
+    if(typeof AE==='undefined') q.push('js/audio.js');
+    if(typeof buildStatic==='undefined') q.push('js/ui.js');
+    if(!q.length){ if(done)done(false); return; }
+    boot.stage='retry '+q.join(', ');
+    (function next(){
+      if(!q.length){ if(done)done(true); return; }
+      loadScript(q.shift(),next);
+    })();
+  };
+  function moduleState(){
+    return 'state='+(typeof S!=='undefined'?'OK':'НЕТ')+' · sysex='+(typeof sxParseFile==='function'?'OK':'НЕТ')+' · audio='+(typeof AE!=='undefined'?'OK':'НЕТ')+' · ui='+(typeof buildStatic==='function'?'OK':'НЕТ');
+  }
+  window.__monoShowBootGuard=function(){
+    var box=document.getElementById('bootGuard'); if(!box||boot.ok) return;
+    var diag=document.getElementById('bootDiag');
+    var lcd=document.getElementById('lcdFallbackText'); if(lcd) lcd.textContent='OS NOT LOADED';
+    if(diag) diag.textContent='build: V'+boot.build+'\n'+(boot.device||'')+'\n'+moduleState()+'\nstage: '+boot.stage+(boot.errors.length?'\n'+boot.errors.slice(0,3).join('\n'):'\nошибок скриптов не видно: возможно, файл открыт в предпросмотре без JavaScript/Web Audio.');
+    box.hidden=false; box.removeAttribute('hidden'); box.classList.add('show');
+  };
+  window.__monoHideBootGuard=function(){
+    boot.ok=true;
+    var box=document.getElementById('bootGuard'); if(box){ box.hidden=true; box.classList.remove('show'); }
+    if(document.body) document.body.classList.add('boot-ok');
+  };
+  window.__monoReload=function(){
+    try{
+      if(/^https?:/.test(location.protocol)){
+        var u=location.href.replace(/([?&])monoRetry=\d+(&|$)/,'$1').replace(/[?&]$/,'');
+        location.href=u+(u.indexOf('?')<0?'?':'&')+'monoRetry='+Date.now(); return;
+      }
+    }catch(e){}
+    location.reload();
+  };
+  window.__monoResetCache=function(){
+    var jobs=[];
+    try{
+      if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations) jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){ return Promise.all(rs.map(function(r){return r.unregister();})); }));
+      if(window.caches&&caches.keys) jobs.push(caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){return caches.delete(k);})); }));
+    }catch(e){ window.__monoBootError('cache reset',e); }
+    function go(){ window.__monoReload(); }
+    if(jobs.length&&window.Promise) Promise.all(jobs).then(go,go); else go();
+  };
+  window.__monoFactoryBoot=function(){
+    if(!window.confirm('Сбросить локальные сохранения Monomachine на этом устройстве и перезагрузить? Паттерны/киты из localStorage будут удалены.')) return;
+    try{ localStorage.removeItem('monomachine_web_v1'); }catch(e){}
+    window.__monoResetCache();
+  };
+  function bind(){
+    var r=document.getElementById('bootReload'),c=document.getElementById('bootCache'),f=document.getElementById('bootFactory'),x=document.getElementById('bootClose');
+    if(r) r.onclick=window.__monoReload;
+    if(c) c.onclick=window.__monoResetCache;
+    if(f) f.onclick=window.__monoFactoryBoot;
+    if(x) x.onclick=function(){ var b=document.getElementById('bootGuard'); if(b)b.hidden=true; };
+    deviceClass();
+  }
+  deviceClass();
+  window.addEventListener('resize',deviceClass);
+  if(window.visualViewport&&visualViewport.addEventListener) visualViewport.addEventListener('resize',deviceClass);
+  window.addEventListener('orientationchange',function(){ setTimeout(deviceClass,90); });
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind); else setTimeout(bind,0);
+  window.addEventListener('load',function(){
+    setTimeout(function(){
+      if(!boot.ok&&(typeof S==='undefined'||typeof AE==='undefined'||typeof buildStatic==='undefined')){
+        window.__monoLoadMissing(function(){ if(typeof bootApp==='function') bootApp(); });
+      }
+    },1100);
+    setTimeout(function(){ if(!boot.ok) window.__monoShowBootGuard(); },2600);
+  });
+})();
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -72,12 +190,21 @@
       </div>
       <div id="bpBody">
         <div id="lcdCol">
-          <div id="lcdBezel"><div class="lcdPx"><canvas id="lcdCanvas" width="128" height="64"></canvas><i class="pxgrid"></i></div></div>
+          <div id="lcdBezel"><div class="lcdPx"><canvas id="lcdCanvas" width="128" height="64"></canvas><i class="pxgrid"></i><span class="lcdFallback" aria-hidden="true"><b>MONOMACHINE</b><small id="lcdFallbackText">WEB OS V5.3.1 · LOADING…</small></span></div></div>
           <div class="sfxLab"><span class="sfx">SFX60</span><span class="wlab small">+&nbsp; 6 TRACK MULTIPLE SYNTHESIS SEQUENCER</span></div>
         </div>
         <div id="knobsCol">
           <div class="dataLab">DATA ENTRY</div>
-          <div id="knobs" aria-label="Data entry knobs A to H"></div>
+          <div id="knobs" aria-label="Data entry knobs A to H">
+            <div class="knob-wrap"><div class="knob" data-idx="0"><div class="knob-ind"></div></div><div class="knob-lab">-</div><div class="knob-letter">A</div></div>
+            <div class="knob-wrap"><div class="knob" data-idx="1"><div class="knob-ind"></div></div><div class="knob-lab">-</div><div class="knob-letter">B</div></div>
+            <div class="knob-wrap"><div class="knob" data-idx="2"><div class="knob-ind"></div></div><div class="knob-lab">-</div><div class="knob-letter">C</div></div>
+            <div class="knob-wrap"><div class="knob" data-idx="3"><div class="knob-ind"></div></div><div class="knob-lab">-</div><div class="knob-letter">D</div></div>
+            <div class="knob-wrap"><div class="knob" data-idx="4"><div class="knob-ind"></div></div><div class="knob-lab">-</div><div class="knob-letter">E</div></div>
+            <div class="knob-wrap"><div class="knob" data-idx="5"><div class="knob-ind"></div></div><div class="knob-lab">-</div><div class="knob-letter">F</div></div>
+            <div class="knob-wrap"><div class="knob" data-idx="6"><div class="knob-ind"></div></div><div class="knob-lab">-</div><div class="knob-letter">G</div></div>
+            <div class="knob-wrap"><div class="knob" data-idx="7"><div class="knob-ind"></div></div><div class="knob-lab">-</div><div class="knob-letter">H</div></div>
+          </div>
         </div>
       </div>
     </section>
@@ -85,13 +212,28 @@
     <aside id="pageCol">
       <div class="plab center">EDIT</div>
       <button id="pageUp" class="creamBtn" type="button" aria-label="Data page up"></button>
-      <div id="pageList"></div>
+      <div id="pageList">
+        <button class="pagerow" type="button" data-page="SYN"><span class="pline"></span><span class="plabel" data-short="SYN">SYNTHESIS</span><span class="pdot"></span></button>
+        <button class="pagerow" type="button" data-page="AMP"><span class="pline"></span><span class="plabel" data-short="AMP">AMPLIFICATION</span><span class="pdot"></span></button>
+        <button class="pagerow" type="button" data-page="FILT"><span class="pline"></span><span class="plabel" data-short="FILT">FILTER</span><span class="pdot"></span></button>
+        <button class="pagerow" type="button" data-page="EFX"><span class="pline"></span><span class="plabel" data-short="EFX">EFFECTS</span><span class="pdot"></span></button>
+        <button class="pagerow" type="button" data-page="LFO1"><span class="pline"></span><span class="plabel" data-short="LFO1">LFO 1</span><span class="pdot"></span></button>
+        <button class="pagerow" type="button" data-page="LFO2"><span class="pline"></span><span class="plabel" data-short="LFO2">LFO 2</span><span class="pdot"></span></button>
+        <button class="pagerow" type="button" data-page="LFO3"><span class="pline"></span><span class="plabel" data-short="LFO3">LFO 3</span><span class="pdot"></span></button>
+      </div>
       <button id="pageDown" class="creamBtn" type="button" aria-label="Data page down"></button>
       <button id="editBtn" class="creamBtn editWide" type="button">MACHINE</button>
     </aside>
 
     <aside id="trackCol">
-      <div id="trackBtns"></div>
+      <div id="trackBtns">
+        <div class="trow" data-trk="0"><span class="led tled"></span><span class="tlab">TRACK<b>1</b></span><button class="creamBtn tbtn" type="button" aria-label="Track 1"><span class="tnum">T1</span></button><span class="muteLab">MUTE</span></div>
+        <div class="trow" data-trk="1"><span class="led tled"></span><span class="tlab">TRACK<b>2</b></span><button class="creamBtn tbtn" type="button" aria-label="Track 2"><span class="tnum">T2</span></button><span class="muteLab">MUTE</span></div>
+        <div class="trow" data-trk="2"><span class="led tled"></span><span class="tlab">TRACK<b>3</b></span><button class="creamBtn tbtn" type="button" aria-label="Track 3"><span class="tnum">T3</span></button><span class="muteLab">MUTE</span></div>
+        <div class="trow" data-trk="3"><span class="led tled"></span><span class="tlab">TRACK<b>4</b></span><button class="creamBtn tbtn" type="button" aria-label="Track 4"><span class="tnum">T4</span></button><span class="muteLab">MUTE</span></div>
+        <div class="trow" data-trk="4"><span class="led tled"></span><span class="tlab">TRACK<b>5</b></span><button class="creamBtn tbtn" type="button" aria-label="Track 5"><span class="tnum">T5</span></button><span class="muteLab">MUTE</span></div>
+        <div class="trow" data-trk="5"><span class="led tled"></span><span class="tlab">TRACK<b>6</b></span><button class="creamBtn tbtn" type="button" aria-label="Track 6"><span class="tnum">T6</span></button><span class="muteLab">MUTE</span></div>
+      </div>
     </aside>
   </div>
 
@@ -163,19 +305,49 @@
         <div class="labBtn"><span class="plab">TRIG SELECT</span><button id="trigSelBtn" class="blackBtn" type="button"></button><span class="brownLab">MIDI SEQ</span></div>
       </div>
       <div class="scaleRow">
-        <div class="scaleLeds"><span class="micro">1/64</span><div id="pageLeds"></div><span class="micro">1:4&nbsp;&nbsp;2:4&nbsp;&nbsp;3:4&nbsp;&nbsp;4:4</span></div>
+        <div class="scaleLeds"><span class="micro">1/64</span><div id="pageLeds"><span class="pled"></span><span class="pled"></span><span class="pled"></span><span class="pled"></span></div><span class="micro">1:4&nbsp;&nbsp;2:4&nbsp;&nbsp;3:4&nbsp;&nbsp;4:4</span></div>
         <div class="labBtn"><button id="btnScale" class="blackBtn" type="button"></button><span class="brownLab">SCALE SETUP</span></div>
       </div>
     </div>
   </div>
 
-  <section id="trigGrid" aria-label="Trig keys"></section>
+  <section id="trigGrid" aria-label="Trig keys">
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="0" aria-label="Trig 1"><span class="t-note"></span></button><span class="t-num">1</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="1" aria-label="Trig 2"><span class="t-note"></span></button><span class="t-num">2</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="2" aria-label="Trig 3"><span class="t-note"></span></button><span class="t-num">3</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="3" aria-label="Trig 4"><span class="t-note"></span></button><span class="t-num">4</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="4" aria-label="Trig 5"><span class="t-note"></span></button><span class="t-num">5</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="5" aria-label="Trig 6"><span class="t-note"></span></button><span class="t-num">6</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="6" aria-label="Trig 7"><span class="t-note"></span></button><span class="t-num">7</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="7" aria-label="Trig 8"><span class="t-note"></span></button><span class="t-num">8</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="8" aria-label="Trig 9"><span class="t-note"></span></button><span class="t-num">9</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="9" aria-label="Trig 10"><span class="t-note"></span></button><span class="t-num">10</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="10" aria-label="Trig 11"><span class="t-note"></span></button><span class="t-num">11</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="11" aria-label="Trig 12"><span class="t-note"></span></button><span class="t-num">12</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="12" aria-label="Trig 13"><span class="t-note"></span></button><span class="t-num">13</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="13" aria-label="Trig 14"><span class="t-note"></span></button><span class="t-num">14</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="14" aria-label="Trig 15"><span class="t-note"></span></button><span class="t-num">15</span></div>
+    <div class="trigcell"><span class="t-led"></span><button class="trig" type="button" data-i="15" aria-label="Trig 16"><span class="t-note"></span></button><span class="t-num">16</span></div>
+  </section>
 
   <footer id="foot">CLEAN-ROOM TRIBUTE · NOT AFFILIATED WITH ELEKTRON · ENGINES AFTER MONO2K</footer>
 </div>
 </div>
 
 <div id="toast"></div>
+
+<div id="bootGuard" role="alert" hidden>
+  <div class="bootGuardHead"><b>MONOMACHINE OS НЕ ЗАПУСТИЛАСЬ</b><button id="bootClose" type="button" aria-label="Закрыть диагностику">×</button></div>
+  <p>Панель уже показана статично, но движок не ожил. Если страница открыта из «Файлы», Telegram/предпросмотра или старой иконки на экране Домой — откройте опубликованную ссылку именно в Safari. В Quick Look JavaScript и Web Audio могут быть отключены.</p>
+  <pre id="bootDiag">Диагностика появится, если JavaScript доступен. Если вы видите этот текст без данных — включите JavaScript в Safari.</pre>
+  <div class="bootGuardBtns">
+    <button id="bootReload" type="button">ПЕРЕЗАГРУЗИТЬ</button>
+    <button id="bootCache" type="button">СБРОСИТЬ КЭШ PWA</button>
+    <button id="bootFactory" type="button">FACTORY BOOT…</button>
+  </div>
+</div>
+<noscript><style>#bootGuard{display:block!important}.lcdFallback small{font-size:10px}</style></noscript>
+
 
 <div id="sheetOverlay">
   <div id="sheet">
@@ -190,7 +362,7 @@
 <script src="js/ui.js"></script>
 <script>
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(r => r.update()).catch(() => {}));
 }
 </script>
 </body>
