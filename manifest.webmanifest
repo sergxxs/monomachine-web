@@ -1,0 +1,15 @@
+{
+  "name": "MONOMACHINE SFX-60+ Web",
+  "short_name": "MONOMACHINE",
+  "description": "Clean-room Monomachine-style multisynthesis sequencer for the browser (iPhone-optimized).",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#26282b",
+  "theme_color": "#26282b",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
