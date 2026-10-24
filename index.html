@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-mono-build="5.3.2">
+<html lang="ru" data-mono-build="5.4.0">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -17,8 +17,22 @@
    classifies the device, captures script failures and can retry a missing
    external module. The full app sets __monoBoot.ok when the panel is live. */
 (function(){
-  var boot={t0:Date.now(),ok:false,stage:'guard',errors:[],failed:{},loadedFrom:{},retried:false,build:'5.3.2'};
+  var boot={t0:Date.now(),ok:false,stage:'guard',errors:[],failed:{},loadedFrom:{},retried:false,build:'5.4.0'};
   window.__monoBoot=boot;
+  var bootLang='ru';
+  try{ var savedLang=window.localStorage&&localStorage.getItem('monomachine_lang'); if(savedLang==='en'||savedLang==='ru') bootLang=savedLang; else if(/^en\b/i.test(navigator.language||'')) bootLang='en'; }catch(e){}
+  boot.lang=bootLang; document.documentElement.lang=bootLang;
+  var BT={
+    ru:{no:'НЕТ',title:'MONOMACHINE OS НЕ ЗАПУСТИЛАСЬ',text:'Панель уже показана статично, но движок не ожил. Если страница открыта из «Файлы», Telegram/предпросмотра или старой иконки на экране Домой — откройте опубликованную ссылку именно в Safari. В Quick Look JavaScript и Web Audio могут быть отключены.',diag:'Диагностика появится, если JavaScript доступен. Если вы видите этот текст без данных — включите JavaScript в Safari.',reload:'ПЕРЕЗАГРУЗИТЬ',cache:'СБРОСИТЬ КЭШ PWA',close:'Закрыть диагностику',hint:'\nподсказка: хостинг не отдал JS-модули. Проверьте папку js рядом с index.html либо замените index.html однофайловой сборкой из github-onefile.',noErrors:'\nошибок скриптов не видно: возможно, файл открыт в предпросмотре без JavaScript/Web Audio.',factory:'Сбросить локальные сохранения Monomachine на этом устройстве и перезагрузить? Паттерны/киты из localStorage будут удалены.'},
+    en:{no:'NO',title:'MONOMACHINE OS DID NOT START',text:'The panel is shown statically, but the engine did not come alive. If this page was opened from Files, Telegram/preview, or an old Home Screen icon, open the published link in Safari instead. JavaScript and Web Audio may be disabled in Quick Look.',diag:'Diagnostics will appear if JavaScript is available. If you see this text without data, enable JavaScript in Safari.',reload:'RELOAD',cache:'RESET PWA CACHE',close:'Close diagnostics',hint:'\nhint: the host did not serve the JS modules. Check that the js folder sits next to index.html, or replace index.html with the one-file build from github-onefile.',noErrors:'\nno script errors are visible: the file may be open in a preview without JavaScript/Web Audio.',factory:'Reset local Monomachine saves on this device and reload? Patterns/kits in localStorage will be deleted.'}
+  };
+  function bt(k){ return (BT[bootLang]&&BT[bootLang][k])||BT.ru[k]||k; }
+  function applyBootLang(){
+    var set=function(id,key){ var e=document.getElementById(id); if(e) e.textContent=bt(key); };
+    set('bootGuardTitle','title'); set('bootGuardText','text'); set('bootReload','reload'); set('bootCache','cache');
+    var d=document.getElementById('bootDiag'); if(d&&!d._monoFilled) d.textContent=bt('diag');
+    var x=document.getElementById('bootClose'); if(x) x.setAttribute('aria-label',bt('close'));
+  }
   function clean(v){ return String(v==null?'':v).replace(/\s+/g,' ').slice(0,260); }
   window.__monoBootError=function(where,e){
     var msg=clean(where)+': '+clean(e&&(e.stack||e.message||e));
@@ -113,17 +127,19 @@
     })();
   };
   function moduleState(){
-    return 'state='+(typeof S!=='undefined'?'OK':'НЕТ')+' · sysex='+(typeof sxParseFile==='function'?'OK':'НЕТ')+' · audio='+(typeof AE!=='undefined'?'OK':'НЕТ')+' · ui='+(typeof buildStatic==='function'?'OK':'НЕТ');
+    return 'state='+(typeof S!=='undefined'?'OK':bt('no'))+' · sysex='+(typeof sxParseFile==='function'?'OK':bt('no'))+' · audio='+(typeof AE!=='undefined'?'OK':bt('no'))+' · ui='+(typeof buildStatic==='function'?'OK':bt('no'));
   }
   window.__monoShowBootGuard=function(){
     var box=document.getElementById('bootGuard'); if(!box||boot.ok) return;
+    applyBootLang();
     var diag=document.getElementById('bootDiag');
     var lcd=document.getElementById('lcdFallbackText'); if(lcd) lcd.textContent='OS NOT LOADED';
     if(diag){
       var joined=boot.errors.join('\n');
       var hint='';
-      if(!hasModule('state')&&/state\.js/.test(joined)) hint='\nподсказка: хостинг не отдал JS-модули. Проверьте папку js рядом с index.html либо замените index.html однофайловой сборкой из github-onefile.';
-      diag.textContent='build: V'+boot.build+'\n'+(boot.device||'')+'\n'+moduleState()+'\nstage: '+boot.stage+(boot.errors.length?'\n'+boot.errors.slice(0,4).join('\n'):'\nошибок скриптов не видно: возможно, файл открыт в предпросмотре без JavaScript/Web Audio.')+hint;
+      if(!hasModule('state')&&/state\.js/.test(joined)) hint=bt('hint');
+      diag._monoFilled=true;
+      diag.textContent='build: V'+boot.build+'\n'+(boot.device||'')+'\n'+moduleState()+'\nstage: '+boot.stage+(boot.errors.length?'\n'+boot.errors.slice(0,4).join('\n'):bt('noErrors'))+hint;
     }
     box.hidden=false; box.removeAttribute('hidden'); box.classList.add('show');
   };
@@ -151,7 +167,7 @@
     if(jobs.length&&window.Promise) Promise.all(jobs).then(go,go); else go();
   };
   window.__monoFactoryBoot=function(){
-    if(!window.confirm('Сбросить локальные сохранения Monomachine на этом устройстве и перезагрузить? Паттерны/киты из localStorage будут удалены.')) return;
+    if(!window.confirm(bt('factory'))) return;
     try{ localStorage.removeItem('monomachine_web_v1'); }catch(e){}
     window.__monoResetCache();
   };
@@ -161,7 +177,7 @@
     if(c) c.onclick=window.__monoResetCache;
     if(f) f.onclick=window.__monoFactoryBoot;
     if(x) x.onclick=function(){ var b=document.getElementById('bootGuard'); if(b)b.hidden=true; };
-    deviceClass();
+    applyBootLang(); deviceClass();
   }
   deviceClass();
   window.addEventListener('resize',deviceClass);
@@ -1173,6 +1189,77 @@ body.boot-ok .lcdFallback{display:none!important}
   .navArrows{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 
+/* v5.4: sheets must live inside every iPhone safe area (including the side
+   notch in landscape), GLOBAL text must stay readable, and the top POWER /
+   REC WAV controls must have real touch targets with visible busy states. */
+:root{
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-r:env(safe-area-inset-right,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+}
+#sheet{
+  left:calc(8px + var(--safe-l));
+  right:calc(8px + var(--safe-r));
+  bottom:calc(8px + var(--safe-b));
+  transform:none;
+  width:auto;
+  max-width:820px;
+  margin:0 auto;
+  max-height:calc(var(--appH,100vh) - var(--safe-t) - var(--safe-b) - 18px);
+  padding:0 16px calc(18px + var(--safe-b));
+  border-radius:14px;
+  font-size:14px;
+  line-height:1.45;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+#sheetHead{
+  top:0;
+  z-index:6;
+  margin:0 -16px 10px;
+  padding:14px 16px 11px;
+  background:linear-gradient(180deg,#e9e6dd,#ddd8cb);
+  border-bottom:1px solid #aaa18d;
+  box-shadow:0 2px 5px rgba(50,42,28,.12);
+}
+#sheetTitle{font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+#sheetClose{min-height:44px;padding:9px 13px;font-size:12px;flex:0 0 auto;touch-action:none}
+.sgroup{font-size:11.5px;margin:16px 0 7px}
+.sbtn{min-height:44px;padding:9px 11px;font-size:12.5px;line-height:1.2}
+.sbtn.small{min-height:40px;padding:8px 9px}
+.scell{min-height:42px;padding:10px 5px;font-size:12.5px;line-height:1.2}
+.scell.small{min-height:38px;padding:8px 3px;font-size:11.5px}
+.snote{font-size:13px;line-height:1.55;padding:10px 12px}
+.slab{font-size:12.5px}
+.syxout{font-size:11.5px;line-height:1.55}
+.help{font-size:13.5px;line-height:1.6}
+.help h3{font-size:13px;margin:16px 0 5px}
+.help ul{margin:6px 0 10px;padding-left:20px}
+.help li{margin:5px 0}
+.langGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.langBtn{min-height:48px;font-size:14px;font-weight:800}
+#topStrip .wavRecBtn,#topStrip .powerBtn{min-height:40px;touch-action:none}
+#topStrip .powerBtn{min-width:76px}
+#topStrip .wavRecBtn{min-width:104px}
+.wavRecBtn.busy,.powerBtn.busy{animation:monoBusy .75s ease-in-out infinite alternate}
+@keyframes monoBusy{from{filter:brightness(.82)}to{filter:brightness(1.18)}}
+button:focus-visible{outline:2px solid #ffb02e;outline-offset:2px}
+#bootGuard{width:min(700px,calc(100vw - 20px - var(--safe-l) - var(--safe-r)));bottom:calc(10px + var(--safe-b));font-size:13.5px}
+#toast{max-width:calc(100vw - 20px - var(--safe-l) - var(--safe-r))}
+@media (orientation:landscape) and (max-height:560px){
+  #unit{grid-template-rows:42px auto auto minmax(0,1fr)}
+  #topStrip{flex-basis:42px;min-height:42px}
+  #sheet{max-width:860px}
+  #sheetHead{padding-top:10px;padding-bottom:8px}
+}
+@media (orientation:landscape) and (max-height:380px){
+  #unit{grid-template-rows:38px auto auto minmax(0,1fr)}
+  #topStrip{flex-basis:38px;min-height:38px}
+  #topStrip .wavRecBtn,#topStrip .powerBtn{min-height:36px}
+  .sbtn{min-height:40px}.scell{min-height:38px}#sheetClose{min-height:40px}
+}
+
 </style>
 </head>
 <body>
@@ -1187,7 +1274,7 @@ body.boot-ok .lcdFallback{display:none!important}
     <span class="hideS">MIDI&nbsp; IN&nbsp;&nbsp;OUT&nbsp;&nbsp;THRU</span>
     <span class="hideS">DC IN</span>
     <span class="topActions">
-      <button id="wavRecBtn" class="wavRecBtn" type="button" aria-pressed="false" title="Записать мастер в WAV"><span class="recDot" aria-hidden="true"></span><span id="wavRecLabel">REC WAV</span><span id="wavRecTime"></span></button>
+      <button id="wavRecBtn" class="wavRecBtn" type="button" aria-pressed="false" title="Записать мастер в WAV" data-i18n-title="recordMasterWav"><span class="recDot" aria-hidden="true"></span><span id="wavRecLabel">REC WAV</span><span id="wavRecTime"></span></button>
       <span class="powerWrap"><i class="led" id="standbyLed"></i><button id="startBtn" class="powerBtn" type="button">POWER</button></span>
     </span>
   </div>
@@ -1232,7 +1319,7 @@ body.boot-ok .lcdFallback{display:none!important}
       </div>
       <div id="bpBody">
         <div id="lcdCol">
-          <div id="lcdBezel"><div class="lcdPx"><canvas id="lcdCanvas" width="128" height="64"></canvas><i class="pxgrid"></i><span class="lcdFallback" aria-hidden="true"><b>MONOMACHINE</b><small id="lcdFallbackText">WEB OS V5.3.2 · LOADING…</small></span></div></div>
+          <div id="lcdBezel"><div class="lcdPx"><canvas id="lcdCanvas" width="128" height="64"></canvas><i class="pxgrid"></i><span class="lcdFallback" aria-hidden="true"><b>MONOMACHINE</b><small id="lcdFallbackText">WEB OS V5.4.0 · LOADING…</small></span></div></div>
           <div class="sfxLab"><span class="sfx">SFX60</span><span class="wlab small">+&nbsp; 6 TRACK MULTIPLE SYNTHESIS SEQUENCER</span></div>
         </div>
         <div id="knobsCol">
@@ -1379,12 +1466,12 @@ body.boot-ok .lcdFallback{display:none!important}
 <div id="toast"></div>
 
 <div id="bootGuard" role="alert" hidden>
-  <div class="bootGuardHead"><b>MONOMACHINE OS НЕ ЗАПУСТИЛАСЬ</b><button id="bootClose" type="button" aria-label="Закрыть диагностику">×</button></div>
-  <p>Панель уже показана статично, но движок не ожил. Если страница открыта из «Файлы», Telegram/предпросмотра или старой иконки на экране Домой — откройте опубликованную ссылку именно в Safari. В Quick Look JavaScript и Web Audio могут быть отключены.</p>
+  <div class="bootGuardHead"><b id="bootGuardTitle" data-i18n="bootTitle">MONOMACHINE OS НЕ ЗАПУСТИЛАСЬ</b><button id="bootClose" type="button" aria-label="Закрыть диагностику" data-i18n-aria="close">×</button></div>
+  <p id="bootGuardText" data-i18n="bootText">Панель уже показана статично, но движок не ожил. Если страница открыта из «Файлы», Telegram/предпросмотра или старой иконки на экране Домой — откройте опубликованную ссылку именно в Safari. В Quick Look JavaScript и Web Audio могут быть отключены.</p>
   <pre id="bootDiag">Диагностика появится, если JavaScript доступен. Если вы видите этот текст без данных — включите JavaScript в Safari.</pre>
   <div class="bootGuardBtns">
-    <button id="bootReload" type="button">ПЕРЕЗАГРУЗИТЬ</button>
-    <button id="bootCache" type="button">СБРОСИТЬ КЭШ PWA</button>
+    <button id="bootReload" type="button" data-i18n="bootReload">ПЕРЕЗАГРУЗИТЬ</button>
+    <button id="bootCache" type="button" data-i18n="bootCache">СБРОСИТЬ КЭШ PWA</button>
     <button id="bootFactory" type="button">FACTORY BOOT…</button>
   </div>
 </div>
@@ -1444,7 +1531,7 @@ const MACHINES=[
  {id:'REVERB',g:'FX',    name:'FX-REVERB', sx:0x0D, fx:true, syn:[P('DEC',80),P('DAMP',60),P('GATE',0),P('MIX',70),P('HP',20),P('LP',100),null,P('INP',0,'enum',INP_LIST)]},
  {id:'CHORUS',g:'FX',    name:'FX-CHORUS', sx:0x0F, fx:true, syn:[P('DEL',40),P('DEP',60),P('SPD',30),P('MIX',64),P('FB',64,'bip'),P('WID',90),P('LP',110),P('INP',0,'enum',INP_LIST)]},
  {id:'DYNAMIX',g:'FX',   name:'FX-DYNAMIX',sx:0x10, fx:true, syn:[P('ATK',30),P('REL',60),P('THRS',60),P('MIX',127),P('RAT',60),P('GAIN',64),P('RMS',64),P('INP',0,'enum',INP_LIST)]},
- {id:'RINGMOD',g:'FX',   name:'FX-RINGMOD',sx:0x11, fx:true, syn:[P('WAVE',0,'enum',['SIN','TRI','SAW','SQR']),P('EXT',0,'onoff'),null,P('MIX',100),null,null,null,P('INP',0,'enum',INP_LIST)]},
+ {id:'RINGMOD',g:'FX',   name:'FX-RINGMOD',sx:0x11, fx:true, syn:[P('WAVE',0,'enum',['SIN','TRI','SAW','SQR']),P('EXT',100),null,P('MIX',100),null,null,null,P('INP',0,'enum',INP_LIST)]},
  {id:'PHASER',g:'FX',    name:'FX-PHASER', sx:0x12, fx:true, syn:[P('CNTR',64),P('DEP',80),P('SPD',30),P('MIX',70),P('FB',40),P('WID',80),null,P('INP',0,'enum',INP_LIST)]},
  {id:'FLANGER',g:'FX',   name:'FX-FLANGER',sx:0x13, fx:true, syn:[P('DEL',30),P('DEP',70),P('SPD',25),P('MIX',70),P('FB',70),P('WID',80),null,P('INP',0,'enum',INP_LIST)]},
 ];
@@ -1689,6 +1776,86 @@ function factoryPatterns(){
     seq(t6,'x...............................',[60],{len:32});
     p.kit='AMB KIT'; add(7,p);
   }
+  { // A09 ELASTIC — SOPHIE-inspired elastic FM, squeaks and ring-modulated waves
+    const p=mkPattern('ELASTIC'); p.bpm=132; p.swing=52;
+    const [t1,t2,t3,t4,t5,t6]=p.tracks;
+    t1.machine='FMDYN'; t1.params=defaultParams('FMDYN');
+    setP(t1,'SYN','1FRQ',18); setP(t1,'SYN','1FEN',0); setP(t1,'SYN','1VOL',124); setP(t1,'SYN','1VEN',118); setP(t1,'SYN','2FRQ',96); setP(t1,'SYN','2ENV',92); setP(t1,'SYN','2FB',64);
+    setP(t1,'AMP','DEC',58); setP(t1,'AMP','DIST',86); setP(t1,'FILT','LPQ',46);
+    seq(t1,'x.....x...x.....x.....x...x.....x.....x...x.....x.....x...x.....',['C1','C1','G1','C1','Eb1','C1','F1','C1'],{len:3,lockAll:i=>({'SYN.1':(i%16<8?0:127),'SYN.6':30+((i*13)%80)})});
+    t2.machine='BBOX'; t2.params=defaultParams('BBOX'); setP(t2,'SYN','PTCH',82); setP(t2,'EFX','SRR',18);
+    seq(t2,'x...x...x...x...x...x...x...x...x...x...x...x...x...x...x...x...',[DR('KICK')],{len:1});
+    seq(t2,'....x.......x.......x.......x.......x.......x.......x.......x...',[DR('CLAP')],{len:1});
+    seq(t2,'..x...x...x...x...x...x...x...x...x...x...x...x...x...x...x...x.',[DR('METAL'),DR('ZAP'),DR('HATC'),DR('COWB')],{len:1});
+    t3.machine='NOIS'; t3.params=defaultParams('NOIS'); setP(t3,'SYN','ST',112); setP(t3,'SYN','STON',127); setP(t3,'AMP','DEC',28); setP(t3,'AMP','VOL',72); setP(t3,'FILT','LPQ',92);
+    seq(t3,'......x.......x...x.........x.......x...x.........x.......x.....',[84,91,96,79],{len:1,lockAll:i=>({'FILT.0':20+((i*19)%80),'FILT.1':34+((i*7)%50),'SYN.1':(i*11)%90})});
+    t4.machine='VO6'; t4.params=defaultParams('VO6'); setP(t4,'AMP','DEC',72); setP(t4,'AMP','VOL',78); setP(t4,'EFX','SRR',12);
+    seq(t4,'x.......x.......x.......x.......x.......x.......x.......x.......',['C4','Eb4','G4','Bb4','G4','Eb4','F4','C4'],{len:4,lockAll:i=>({'SYN.0':35+((i*17)%90),'SYN.1':110-((i*17)%90),'SYN.4':(i*29)%128})});
+    t5.machine='DWAVE'; t5.params=defaultParams('DWAVE'); t5.out='NEIB'; setP(t5,'SYN','WPM',54); setP(t5,'AMP','DEC',96); setP(t5,'AMP','VOL',86);
+    seq(t5,'x...x.......x...x...x.......x...x...x.......x...x...x.......x...',['C3','Eb3','G3','C4','Bb3','G3'],{len:3,lockAll:i=>({'SYN.0':(i*9)%128,'SYN.1':(i*23)%128})});
+    t6.machine='RINGMOD'; t6.params=defaultParams('RINGMOD'); setP(t6,'SYN','EXT',118); setP(t6,'SYN','MIX',104); setP(t6,'AMP','DEC',127); setP(t6,'AMP','HOLD',127); setP(t6,'AMP','VOL',92);
+    seq(t6,'x...............x...............x...............x...............',['C3','G3','Eb4','Bb3'],{len:16});
+    p.kit='ELAST KIT'; add(8,p);
+  }
+  { // A10 PLASTIC — bit-reduced doubledraw plucks, glassy FM and glossy chorus
+    const p=mkPattern('PLASTIC'); p.bpm=124; p.swing=56;
+    const [t1,t2,t3,t4,t5,t6]=p.tracks;
+    t1.machine='DDRW'; t1.params=defaultParams('DDRW'); setP(t1,'SYN','BR1',54); setP(t1,'SYN','BR2',38); setP(t1,'SYN','WID',88); setP(t1,'AMP','DEC',44); setP(t1,'FILT','LPQ',58);
+    seq(t1,'x..x..x....x..x.x..x..x....x..x.x..x..x....x..x.x..x..x....x..x.',['F3','Ab3','C4','Eb4','C4','Ab3'],{len:2,lockAll:i=>({'SYN.1':(i*21)%128,'SYN.4':20+((i*11)%80),'SYN.6':10+((i*17)%70)})});
+    t2.machine='FMPAR'; t2.params=defaultParams('FMPAR'); setP(t2,'SYN','1FRQ',84); setP(t2,'SYN','1ENV',96); setP(t2,'SYN','2FRQ',112); setP(t2,'SYN','2ENV',62); setP(t2,'SYN','3FRQ',124); setP(t2,'SYN','3ENV',38); setP(t2,'SYN','TONE',124); setP(t2,'AMP','DEC',88); setP(t2,'AMP','VOL',70);
+    seq(t2,'........x...........x...........x...........x...........x.......',['F5','Eb5','C5','Ab4','Bb4'],{len:6});
+    t3.machine='SID'; t3.params=defaultParams('SID'); setP(t3,'SYN','WAVE',64); setP(t3,'SYN','MOD',90); setP(t3,'SYN','PWAD',104); setP(t3,'AMP','DEC',38); setP(t3,'AMP','VOL',64); setP(t3,'EFX','SRR',28);
+    seq(t3,'..x.......x...x.......x.......x...x.......x...x.......x.......x..',['F4','Ab4','C5','F5'],{len:2,lockAll:i=>({'SYN.0':(i*13)%128,'SYN.6':(i*31)%128})});
+    t4.machine='BBOX'; t4.params=defaultParams('BBOX'); setP(t4,'SYN','PTCH',92);
+    seq(t4,'x......x..x.....x......x..x.....x......x..x.....x......x...x....',[DR('KICK2')],{len:1});
+    seq(t4,'....x.......x.......x.......x.......x.......x.......x.......x...',[DR('RIM')],{len:1});
+    seq(t4,'x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.',[DR('CLICK'),DR('STICK'),DR('BLIP')],{len:1});
+    t5.machine='SIN'; t5.params=defaultParams('SIN'); t5.out='NEIB'; setP(t5,'AMP','DEC',118); setP(t5,'AMP','DIST',76);
+    seq(t5,'x...............x...............x...............x...............',['F1','Db1','Ab1','Eb1'],{len:12});
+    t6.machine='CHORUS'; t6.params=defaultParams('CHORUS'); setP(t6,'SYN','DEP',96); setP(t6,'SYN','SPD',72); setP(t6,'SYN','MIX',78); setP(t6,'SYN','WID',122); setP(t6,'AMP','DEC',127); setP(t6,'AMP','HOLD',127); setP(t6,'AMP','VOL',84);
+    seq(t6,'x...............................................................',[60],{len:64});
+    p.kit='PLAST KIT'; add(9,p);
+  }
+  { // A11 Latex — rubbery VO-6 formants, tuned stereo noise and soft FM
+    const p=mkPattern('Latex'); p.bpm=108; p.swing=60;
+    const [t1,t2,t3,t4,t5,t6]=p.tracks;
+    t1.machine='VO6'; t1.params=defaultParams('VO6'); setP(t1,'AMP','DEC',112); setP(t1,'AMP','VOL',88); setP(t1,'SYN','V-SW',127);
+    seq(t1,'x.......x.......x.......x.......x.......x.......x.......x.......',['D3','F3','A3','C4','A3','F3','G3','D3'],{len:7,lockAll:i=>({'SYN.0':(i*19)%128,'SYN.1':127-((i*19)%128),'SYN.4':(i*37)%128,'SYN.5':28+((i*9)%60)})});
+    t2.machine='FMSTAT'; t2.params=defaultParams('FMSTAT'); setP(t2,'SYN','1FRQ',26); setP(t2,'SYN','1ENV',112); setP(t2,'SYN','1FB',58); setP(t2,'SYN','TONE',82); setP(t2,'AMP','DEC',76); setP(t2,'AMP','DIST',80);
+    seq(t2,'x......x....x...x......x....x...x......x....x...x......x....x...',['D1','D1','F1','A1','G1','D1'],{len:5,lockAll:i=>({'SYN.2':50+((i*17)%72),'SYN.3':20+((i*13)%80)})});
+    t3.machine='NOIS'; t3.params=defaultParams('NOIS'); setP(t3,'SYN','ST',127); setP(t3,'SYN','RED',52); setP(t3,'SYN','STON',127); setP(t3,'AMP','DEC',34); setP(t3,'AMP','VOL',58); setP(t3,'FILT','LPQ',76);
+    seq(t3,'..x...x...x...x...x...x...x...x...x...x...x...x...x...x...x...x.',[74,79,86,91],{len:1,lockAll:i=>({'SYN.0':70+((i*5)%57),'SYN.1':(i*23)%110,'FILT.0':(i*7)%80})});
+    t4.machine='ENS'; t4.params=defaultParams('ENS'); setP(t4,'AMP','ATK',28); setP(t4,'AMP','DEC',127); setP(t4,'AMP','VOL',52); setP(t4,'SYN','CHRW',122);
+    seq(t4,'x...............x...............x...............x...............',['D3','Bb2','F3','A2'],{len:15});
+    setLocks(t4.steps[0],{'SYN.0':85,'SYN.1':101}); setLocks(t4.steps[16],{'SYN.0':80,'SYN.1':101}); setLocks(t4.steps[32],{'SYN.0':85,'SYN.1':101}); setLocks(t4.steps[48],{'SYN.0':80,'SYN.1':101});
+    t5.machine='BBOX'; t5.params=defaultParams('BBOX'); t5.out='NEIB'; setP(t5,'SYN','PTCH',76);
+    seq(t5,'x.....x...x.....x.....x...x.....x.....x...x.....x.....x...x.....',[DR('KICK')],{len:1});
+    seq(t5,'....x.......x.......x.......x.......x.......x.......x.......x...',[DR('CLAP')],{len:1});
+    seq(t5,'..x...x...x...x...x...x...x...x...x...x...x...x...x...x...x...x.',[DR('SHAKE'),DR('HATC')],{len:1});
+    t6.machine='REVERB'; t6.params=defaultParams('REVERB'); setP(t6,'SYN','DEC',92); setP(t6,'SYN','MIX',58); setP(t6,'AMP','DEC',127); setP(t6,'AMP','HOLD',127); setP(t6,'AMP','VOL',78);
+    seq(t6,'x...............................................................',[60],{len:64});
+    p.kit='Latex KIT'; add(10,p);
+  }
+  { // A12 GLASSLAB — fast glass FM, scanned waves and flanged metal
+    const p=mkPattern('GLASSLAB'); p.bpm=140; p.swing=50;
+    const [t1,t2,t3,t4,t5,t6]=p.tracks;
+    t1.machine='FMPAR'; t1.params=defaultParams('FMPAR'); setP(t1,'SYN','1FRQ',96); setP(t1,'SYN','1ENV',108); setP(t1,'SYN','2FRQ',118); setP(t1,'SYN','2ENV',74); setP(t1,'SYN','3FRQ',126); setP(t1,'SYN','3ENV',44); setP(t1,'SYN','TONE',127); setP(t1,'AMP','DEC',66); setP(t1,'AMP','VOL',76);
+    seq(t1,'x.x...x...x.x...x.x...x...x.x...x.x...x...x.x...x.x...x...x.x...',['E5','G5','B5','D6','B5','G5'],{len:3,lockAll:i=>({'SYN.1':60+((i*11)%64),'SYN.3':30+((i*17)%80)})});
+    t2.machine='DWAVE'; t2.params=defaultParams('DWAVE'); setP(t2,'SYN','WPM',88); setP(t2,'AMP','DEC',54); setP(t2,'AMP','VOL',72); setP(t2,'EFX','SRR',22);
+    seq(t2,'..x...x...x...x...x...x...x...x...x...x...x...x...x...x...x...x.',['E4','G4','B4','D5'],{len:2,lockAll:i=>({'SYN.0':(i*8)%128,'SYN.1':(i*17)%128})});
+    t3.machine='DENS'; t3.params=defaultParams('DENS'); setP(t3,'AMP','ATK',12); setP(t3,'AMP','DEC',124); setP(t3,'AMP','VOL',54); setP(t3,'SYN','CHRW',124);
+    seq(t3,'x...............x...............x...............x...............',['E3','C3','G3','D3'],{len:15});
+    setLocks(t3.steps[0],{'SYN.0':80,'SYN.1':101,'SYN.2':117}); setLocks(t3.steps[16],{'SYN.0':85,'SYN.1':101}); setLocks(t3.steps[32],{'SYN.0':85,'SYN.1':101}); setLocks(t3.steps[48],{'SYN.0':85,'SYN.1':101});
+    t4.machine='BBOX'; t4.params=defaultParams('BBOX'); setP(t4,'SYN','PTCH',104); setP(t4,'EFX','SRR',30);
+    seq(t4,'x...x...x...x...x...x...x...x...x...x...x...x...x...x...x...x...',[DR('KICK')],{len:1});
+    seq(t4,'....x.......x.......x.......x.......x.......x.......x.......x...',[DR('SNAR2')],{len:1});
+    seq(t4,'x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.',[DR('METAL'),DR('ZAP'),DR('BLIP'),DR('HATC')],{len:1});
+    t5.machine='FMDYN'; t5.params=defaultParams('FMDYN'); t5.out='NEIB'; setP(t5,'SYN','1FEN',127); setP(t5,'SYN','1VOL',118); setP(t5,'SYN','1VEN',104); setP(t5,'SYN','2FB',72); setP(t5,'AMP','DEC',70);
+    seq(t5,'x.......x.......x.......x.......x.......x.......x.......x.......',['E1','E1','G1','B1','E1','D1','C1','B0'],{len:5,lockAll:i=>({'SYN.1':(i%2?0:127),'SYN.6':30+((i*19)%84)})});
+    t6.machine='FLANGER'; t6.params=defaultParams('FLANGER'); setP(t6,'SYN','DEP',112); setP(t6,'SYN','SPD',86); setP(t6,'SYN','MIX',96); setP(t6,'SYN','FB',104); setP(t6,'SYN','WID',124); setP(t6,'AMP','DEC',127); setP(t6,'AMP','HOLD',127); setP(t6,'AMP','VOL',86);
+    seq(t6,'x...............................................................',[60],{len:64});
+    p.kit='GLASS KIT'; add(11,p);
+  }
   return P128;
 }
 function factoryKits(){
@@ -1716,7 +1883,7 @@ const S={
   octave:4, gridRec:true, liveRec:false, playing:false, playStep:-1,
   lockStep:-1,            // step being p-lock edited (latched), -1 none
   selStep:0,
-  masterVol:0.85, poly:false, midiOut:false, followPage:true,
+  masterVol:0.85, poly:false, midiOut:false, followPage:true, lang:'ru',
   song:[], songMode:false, songPos:0, songCount:0,
   userWaves:new Array(64).fill(null), // {data:Float32Array(256), name} for DDRW/DENS slots 33-64 etc
   userSamples:{},         // BBOX idx -> AudioBuffer (not persisted raw; persisted as wav dataURL small)
@@ -1744,7 +1911,8 @@ function saveNow(){
       const blank=p.name==='INIT'&&p.tracks.every(t=>t.steps.every(s=>!s.on)); if(blank) continue; // don't waste quota on untouched slots
       pats[k]=p; }
     const waves=S.userWaves.map(w=>w?{name:w.name,data:Array.from(w.data)}:null);
-    localStorage.setItem(LS_KEY, JSON.stringify({patterns:pats,kits:S.kits,userWaves:waves,curPat:S.curPat,masterVol:S.masterVol,song:S.song}));
+    localStorage.setItem(LS_KEY, JSON.stringify({patterns:pats,kits:S.kits,userWaves:waves,curPat:S.curPat,masterVol:S.masterVol,song:S.song,lang:S.lang}));
+    try{ localStorage.setItem('monomachine_lang',S.lang==='en'?'en':'ru'); }catch(e2){}
   }catch(e){/* quota */}
 }
 function _finiteNum(v,fallback){ const n=+v; return isFinite(n)?n:fallback; }
@@ -1825,6 +1993,7 @@ function revivePattern(src){ // tolerate older/partial/corrupt data without taki
   return base;
 }
 function loadSaved(){
+  try{ const savedLang=localStorage.getItem('monomachine_lang'); if(savedLang==='en'||savedLang==='ru') S.lang=savedLang; else if(typeof navigator!=='undefined'&&navigator.language&&/^en\b/i.test(navigator.language)) S.lang='en'; }catch(e){}
   S._factory=factoryPatterns();
   S.kits=factoryKits();
   S.patterns={};
@@ -1851,6 +2020,8 @@ function loadSaved(){
     }
     if(typeof d.curPat==='number') S.curPat=clamp(Math.round(_finiteNum(d.curPat,0)),0,127);
     if(typeof d.masterVol==='number') S.masterVol=clamp(_finiteNum(d.masterVol,0.85),0,1);
+    if(d.lang==='en'||d.lang==='ru') S.lang=d.lang;
+    try{ const savedLang=localStorage.getItem('monomachine_lang'); if(savedLang==='en'||savedLang==='ru') S.lang=savedLang; }catch(e2){}
     if(Array.isArray(d.song)) S.song=d.song.slice(0,256).map(r=>({pat:clamp(Math.round(_finiteNum(r&&r.pat,0)),0,127),rep:clamp(Math.round(_finiteNum(r&&r.rep,1)),1,64)}));
   }catch(e){
     // Corrupt storage is recoverable: factory content is already installed above.
@@ -2555,7 +2726,7 @@ async function initAudio(){
 }
 async function initAudioOnce(){
   const AC=window.AudioContext||window.webkitAudioContext;
-  if(!AC) throw new Error('Web Audio недоступен в этом браузере');
+  if(!AC) throw new Error('Web Audio is not available in this browser');
   let ctx;
   try{ ctx=new AC({latencyHint:'interactive'}); }catch(e){ ctx=new AC(); }
   AE.ctx=ctx;
@@ -2569,6 +2740,9 @@ async function initAudioOnce(){
   const nb=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate), d=nb.getChannelData(0);
   for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
   AE.noiseBuf=nb;
+  const nbR=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate), dR=nbR.getChannelData(0);
+  for(let i=0;i<dR.length;i++) dR[i]=Math.random()*2-1;
+  AE.noiseBufR=nbR;
   AE.waves32=makeWaves32(ctx); AE.wavesClassic=makeClassicWaves(ctx);
   // SRR worklet (sample & hold). Fallback: quantizer shaper.
   try{
@@ -2677,13 +2851,24 @@ function rebuildFX(ta,machineId){
     procIn.connect(fx.comp); fx.comp.connect(fx.makeup); fx.makeup.connect(wet);
   } else if(machineId==='RINGMOD'){
     fx.ring=N(mkGain(0)); fx.carrier=N(mkOsc('sine',220)); fx.carG=N(mkGain(1));
+    fx.extIn=N(mkGain(1)); fx.extPass=N(mkGain(0));
     fx.carrier.connect(fx.carG); fx.carG.connect(fx.ring.gain); fx.carrier.start();
-    procIn.connect(fx.ring); fx.ring.connect(wet);
+    // EXT is the amount of the incoming signal sent into the ring modulator;
+    // the remainder stays unmodulated inside the wet path (MIX then blends dry/wet).
+    procIn.connect(fx.extIn); fx.extIn.connect(fx.ring); fx.ring.connect(wet);
+    procIn.connect(fx.extPass); fx.extPass.connect(wet);
   } else if(machineId==='PHASER'){
-    fx.aps=[]; fx.lfo=N(mkOsc('sine',0.4)); fx.fb=N(mkGain(0.3)); fx.lfo.start();
+    fx.aps=[]; fx.aps2=[]; fx.lfoGs=[]; fx.lfoGs2=[]; fx.lfo=N(mkOsc('sine',0.4)); fx.fb=N(mkGain(0.3)); fx.fb2=N(mkGain(0.3)); fx.lfo.start();
+    fx.panA=ctx.createStereoPanner?N(ctx.createStereoPanner()):N(mkGain(1));
+    fx.panB=ctx.createStereoPanner?N(ctx.createStereoPanner()):N(mkGain(1));
+    fx.gainB=N(mkGain(0));
     let prev=procIn;
-    for(let i=0;i<4;i++){ const ap=N(mkFilter('allpass',600,1.2)); const lg=N(mkGain(400)); fx.lfo.connect(lg); lg.connect(ap.frequency); fx.aps.push(ap); prev.connect(ap); prev=ap; if(i===0)fx.lfoG=lg; else lg.gain.value=400; }
-    prev.connect(wet); prev.connect(fx.fb); fx.fb.connect(fx.aps[0]);
+    for(let i=0;i<4;i++){ const ap=N(mkFilter('allpass',600,1.2)); const lg=N(mkGain(400)); fx.lfo.connect(lg); lg.connect(ap.frequency); fx.aps.push(ap); fx.lfoGs.push(lg); prev.connect(ap); prev=ap; if(i===0)fx.lfoG=lg; }
+    prev.connect(fx.panA); fx.panA.connect(wet); prev.connect(fx.fb); fx.fb.connect(fx.aps[0]);
+    // WID: a second, oppositely swept allpass pair panned to the other side.
+    let prev2=procIn;
+    for(let i=0;i<2;i++){ const ap=N(mkFilter('allpass',600,1.2)); const lg=N(mkGain(-400)); fx.lfo.connect(lg); lg.connect(ap.frequency); fx.aps2.push(ap); fx.lfoGs2.push(lg); prev2.connect(ap); prev2=ap; }
+    prev2.connect(fx.gainB); fx.gainB.connect(fx.panB); fx.panB.connect(wet); prev2.connect(fx.fb2); fx.fb2.connect(fx.aps2[0]);
   }
   ta.fxNodes=fx;
 }
@@ -2722,12 +2907,18 @@ function applyFXParams(ta,eff){
     fx.makeup.gain.setTargetAtTime(Math.pow(10,((v[5]-64)/63*18)/20),t,0.03);
     c.knee.setTargetAtTime(v[6]/127*30,t,0.03);
   }
-  else if(m==='RINGMOD'){ const waves=['sine','triangle','sawtooth','square']; fx.carrier.type=waves[enumIdx(MACH.RINGMOD.syn[0],v[0])]; mix(3); }
-  else if(m==='PHASER'){ const c=FREQ(v[0]+10); fx.aps.forEach(ap=>ap.frequency.setTargetAtTime(c,t,0.05));
-    fx.aps.forEach((ap,i)=>{}); if(fx.lfoG) fx.lfoG.gain.setTargetAtTime((v[1]/127)*c*0.9,t,0.05);
-    fx.all.forEach(n=>{ if(n.gain&&n!==fx.dry&&n!==fx.wet&&n!==fx.fb&&n!==fx.procIn&&n!==fx.lfoG){ try{n.gain.setTargetAtTime((v[1]/127)*c*0.9,t,0.05);}catch(e){} }});
+  else if(m==='RINGMOD'){ const waves=['sine','triangle','sawtooth','square']; fx.carrier.type=waves[enumIdx(MACH.RINGMOD.syn[0],v[0])]; const ext=v[1]/127; if(fx.extIn)fx.extIn.gain.setTargetAtTime(ext,t,0.03); if(fx.extPass)fx.extPass.gain.setTargetAtTime(1-ext,t,0.03); mix(3); }
+  else if(m==='PHASER'){ const c=FREQ(v[0]+10), dep=(v[1]/127)*c*0.9, wid=v[5]/127;
+    fx.aps.forEach(ap=>ap.frequency.setTargetAtTime(c,t,0.05));
+    (fx.aps2||[]).forEach(ap=>ap.frequency.setTargetAtTime(c,t,0.05));
+    (fx.lfoGs||[fx.lfoG]).forEach(g=>{ if(g) g.gain.setTargetAtTime(dep,t,0.05); });
+    (fx.lfoGs2||[]).forEach(g=>g.gain.setTargetAtTime(-dep,t,0.05));
     fx.lfo.frequency.setTargetAtTime(0.03+Math.pow(v[2]/127,1.6)*7,t,0.05); mix(3);
     fx.fb.gain.setTargetAtTime(v[4]/127*0.85,t,0.05);
+    if(fx.fb2) fx.fb2.gain.setTargetAtTime(v[4]/127*0.85,t,0.05);
+    if(fx.panA&&fx.panA.pan) fx.panA.pan.setTargetAtTime(-wid*0.85,t,0.05);
+    if(fx.panB&&fx.panB.pan) fx.panB.pan.setTargetAtTime(wid*0.85,t,0.05);
+    if(fx.gainB) fx.gainB.gain.setTargetAtTime(wid,t,0.05);
   }
   // INP source select
   const inp=enumIdx({e:INP_LIST}, v[7]);
@@ -2818,17 +3009,41 @@ function newVoice(dest){ const out=mkGain(1); out.connect(dest); return {out,osc
   glide(f,t,sec){ this.oscs.forEach(x=>{ if(x.o.frequency) x.o.frequency.exponentialRampToValueAtTime(Math.max(8,f*x.ratio),t+Math.max(0.005,sec)); if(x.o.playbackRate&&x.rate0) x.o.playbackRate.exponentialRampToValueAtTime(Math.max(0.05,x.rate0*(f/this.baseF)),t+Math.max(0.005,sec)); }); if(this.onGlide)this.onGlide(f,t,sec); this.baseF=f; }
 };}
 function stopVoice(ta,t,hard){ if(ta.voice){ ta.voice.stop(t); ta.voice=null; } }
-function noiseSrc(rate=1,loop=true){ const s=AE.ctx.createBufferSource(); s.buffer=AE.noiseBuf; s.loop=loop; s.playbackRate.value=rate; return s; }
+function noiseSrc(rate=1,loop=true,buffer){ const s=AE.ctx.createBufferSource(); s.buffer=buffer||AE.noiseBuf; s.loop=loop; s.playbackRate.value=rate; return s; }
+function startSweepOsc(osc,restart,t){
+  // PWRS/WPRS: ON restarts the sweep with the note (voice startAll does it);
+  // OFF lets the sweep run freely, so start it immediately instead of at note time.
+  if(restart||!osc||osc._st) return;
+  try{ osc.start(Math.min(nowT(),t||nowT())); osc._st=1; }catch(e){}
+}
 
 /* ---------- machines ---------- */
 const BUILDERS={
  GND(){ return {empty:true}; },
  SIN(v,f,P){ const o=mkOsc('sine',f); regOsc(v,o,1); o.connect(v.out); v.nodes.push(o); },
- NOIS(v,f,P){ const S=P.SYN; const red=S[1]/127; const rate=(0.25+f/220)*(1-red*0.85);
-   const n=noiseSrc(Math.max(0.05,rate)); v.oscs.push({o:n,ratio:1,det:0,rate0:rate});
-   const bp=mkFilter('bandpass',clamp(f*(1+red*3),60,16000),0.6+S[0]/127*4); const g=mkGain(0.9);
-   n.connect(bp); bp.connect(g); g.connect(v.out); v.nodes.push(n);
-   v.syn[1]=val=>{ n.playbackRate.setTargetAtTime(Math.max(0.05,(0.25+v.baseF/220)*(1-val/127*0.85)),nowT(),0.03); };
+ NOIS(v,f,P){ const S=P.SYN; const st={width:S[0],red:S[1],on:S[2]>=64};
+   const rateFor=redRaw=>Math.max(0.05,(0.25+(v.baseF||f)/220)*(1-redRaw/127*0.85));
+   const mkSide=(buffer)=>{
+     const rate=rateFor(st.red), n=noiseSrc(rate,true,buffer);
+     v.oscs.push({o:n,ratio:1,det:0,rate0:rate});
+     const bp=mkFilter('bandpass',clamp(f*(1+st.red/127*3),60,16000),0.8);
+     const g=mkGain(0.62), pan=AE.ctx.createStereoPanner?AE.ctx.createStereoPanner():mkGain(1);
+     n.connect(bp); bp.connect(g); g.connect(pan); if(pan.connect)pan.connect(v.out); v.nodes.push(n);
+     return {n,bp,g,pan};
+   };
+   const L=mkSide(AE.noiseBuf), R=mkSide(AE.noiseBufR||AE.noiseBuf);
+   const applyStereo=()=>{
+     const w=st.on?st.width/127:0, t=nowT();
+     if(L.pan.pan) L.pan.pan.setTargetAtTime(-w,t,0.03);
+     if(R.pan.pan) R.pan.pan.setTargetAtTime(w,t,0.03);
+     L.g.gain.setTargetAtTime(st.on?0.62:0.9,t,0.03);
+     R.g.gain.setTargetAtTime(st.on?0.62:0,t,0.03);
+   };
+   applyStereo();
+   // ST = stereo width, RED = colour, STON = stereo on/off (Appendix A).
+   v.syn[0]=val=>{ st.width=val; applyStereo(); };
+   v.syn[1]=val=>{ st.red=val; const r=rateFor(val), t=nowT(); [L,R].forEach(side=>{ side.n.playbackRate.setTargetAtTime(r,t,0.03); side.bp.frequency.setTargetAtTime(clamp((v.baseF||f)*(1+val/127*3),60,16000),t,0.03); }); };
+   v.syn[2]=val=>{ st.on=val>=64; applyStereo(); };
  },
  SID(v,f,P,ti){ const S=P.SYN, wave=enumIdx(MACH.SID.syn[3],S[3]), mod=enumIdx(MACH.SID.syn[4],S[4]), msrc=enumIdx(MACH.SID.syn[5],S[5]);
    const sh=AE.ctx.createWaveShaper(); setQuant(sh,10); const post=mkGain(0.9); sh.connect(post); post.connect(v.out); v.nodes.push(sh);
@@ -2843,7 +3058,7 @@ const BUILDERS={
    else { const n=noiseSrc(Math.max(0.05,f/160)); v.oscs.push({o:n,ratio:1,det:0,rate0:Math.max(0.05,f/160)}); const bp=mkFilter('bandpass',clamp(f*2,80,15000),0.8); n.connect(bp); bp.connect(carrierIn); v.nodes.push(n); }
    if(p.out&&wave!==2&&wave!==3){ /* unused pulse unit still started cheaply only if connected */ }
    // PW sweep (PWAD): slow triangle LFO on pulse offset, restarted on trig if PWRS
-   if(S[1]>0&&(wave===2||wave===3)){ const lfo=mkOsc('triangle',0.15+S[1]/127*5), lg=mkGain(S[1]/127*0.75); lfo.connect(lg); lg.connect(p.pwParam); v.nodes.push(lfo); }
+   if(S[1]>0&&(wave===2||wave===3)){ const lfo=mkOsc('triangle',0.15+S[1]/127*5), lg=mkGain(S[1]/127*0.75); lfo.connect(lg); lg.connect(p.pwParam); v.nodes.push(lfo); startSweepOsc(lfo,S[2]>=64,arguments[5]); }
    const mf = msrc===1? (AE.tracks[(ti+5)%6].curFreq||f) : f*(0.25+Math.pow(S[6]/127,1.6)*15.75);
    if(mod===1){ const m=mkOsc('sine',mf), mg=mkGain(1); m.connect(mg); mg.connect(ringG.gain); v.nodes.push(m); regOsc(v,m,mf/f); }
    if(mod===2){ const m=mkOsc('sine',mf), mg=mkGain(f*(1+S[6]/127*3)); m.connect(mg); v.oscs.forEach(x=>{if(x.o.frequency)mg.connect(x.o.frequency);}); v.nodes.push(m); }
@@ -2863,7 +3078,7 @@ const BUILDERS={
    if(unil>0.01){ pAll.push(mkp(uniw,0.45*unil)); pAll.push(mkp(-uniw,0.45*unil)); }
    if(S[2]>0){ const o=mkOsc('sine',f/2); regOsc(v,o,0.5); const g=mkGain(0.5*S[2]/127); o.connect(g); g.connect(v.out); v.nodes.push(o); }
    if(S[3]>0){ const o=mkOsc('sine',f/4); regOsc(v,o,0.25); const g=mkGain(0.5*S[3]/127); o.connect(g); g.connect(v.out); v.nodes.push(o); }
-   if(S[5]>0){ const lfo=mkOsc('triangle',0.12+S[5]/127*4.5); pAll.forEach(p=>{ const lg=mkGain(S[5]/127*0.7); lfo.connect(lg); lg.connect(p.pwParam); }); v.nodes.push(lfo); }
+   if(S[5]>0){ const lfo=mkOsc('triangle',0.12+S[5]/127*4.5); pAll.forEach(p=>{ const lg=mkGain(S[5]/127*0.7); lfo.connect(lg); lg.connect(p.pwParam); }); v.nodes.push(lfo); startSweepOsc(lfo,S[6]>=64,arguments[5]); }
    v.syn[4]=val=>pAll.forEach(p=>p.pwParam.setTargetAtTime(pwToOffset(0.5+(val-64)/127),nowT(),0.02));
  },
  ENS(v,f,P){ ensVoice(v,f,P,null); },
@@ -2874,7 +3089,7 @@ const BUILDERS={
    const g2=mkGain(Math.pow(S[1]/127,1.4)), g1=mkGain(1-Math.pow(S[1]/127,1.4)*0.9);
    const sh=AE.ctx.createWaveShaper(); setQuant(sh,12); const post=mkGain(0.85); sh.connect(post); post.connect(v.out);
    o1.connect(g1); g1.connect(sh); o2.connect(g2); g2.connect(sh); v.nodes.push(o1,o2,sh);
-   if(S[2]>0){ const lfo=mkOsc('triangle',0.1+S[2]/127*3.2), lg=mkGain(0.45), lg2=mkGain(-0.4); lfo.connect(lg); lg.connect(g2.gain); lfo.connect(lg2); lg2.connect(g1.gain); v.nodes.push(lfo); }
+   if(S[2]>0){ const lfo=mkOsc('triangle',0.1+S[2]/127*3.2), lg=mkGain(0.45), lg2=mkGain(-0.4); lfo.connect(lg); lg.connect(g2.gain); lfo.connect(lg2); lg2.connect(g1.gain); v.nodes.push(lfo); startSweepOsc(lfo,S[3]>=64,arguments[5]); }
    const sync=enumIdx(MACH.DWAVE.syn[4],S[4]);
    if(sync>0){ const sf=sync===1?(AE.tracks[(ti+5)%6].curFreq||f): f*(0.5+S[5]/127*7.5); const m=mkOsc('sine',sf), mg=mkGain(f*1.6); m.connect(mg); mg.connect(o1.frequency); mg.connect(o2.frequency); v.nodes.push(m); }
    v.syn[1]=val=>{ const x=Math.pow(val/127,1.4); g2.gain.setTargetAtTime(x,nowT(),0.03); g1.gain.setTargetAtTime(1-x*0.9,nowT(),0.03); };
@@ -3338,9 +3553,197 @@ function initUiStateFields(){
   if(!S._rndAmount) S._rndAmount='RANDOM';
   if(!S._rndMachines) S._rndMachines='THEME';
   if(!S._rndTheme) S._rndTheme='AUTO';
+  if(S.lang!=='en'&&S.lang!=='ru') S.lang='ru';
   return true;
 }
 initUiStateFields();
+/* ---------- language (RU / EN) ---------- */
+const I18N={
+ru:{
+  close:'Закрыть', recordMasterWav:'Записать мастер в WAV', starting:'СТАРТ…', saving:'СОХРАН…',
+  bootTitle:'MONOMACHINE OS НЕ ЗАПУСТИЛАСЬ', bootText:'Панель уже показана статично, но движок не ожил. Если страница открыта из «Файлы», Telegram/предпросмотра или старой иконки на экране Домой — откройте опубликованную ссылку именно в Safari. В Quick Look JavaScript и Web Audio могут быть отключены.', bootDiag:'Диагностика появится, если JavaScript доступен. Если вы видите этот текст без данных — включите JavaScript в Safari.', bootReload:'ПЕРЕЗАГРУЗИТЬ', bootCache:'СБРОСИТЬ КЭШ PWA',
+  machineTitle:'KIT EDIT — MACHINE T{n} (как на железке: SYN сбросится)',
+  machineFxNote:'FX-машины обрабатывают NEIB (предыдущий трек) / INP (вход) / BUS — вход выбирается ручкой H (INP) на странице SYN. Триги FX-трека открывают гейт огибающей AMP, как на оригинале. В MIXER можно увести трек в NEIB (без MAIN).',
+  patternTitle:'PATTERN — банки A–H × 16 (128 паттернов)', patternNamePrompt:'Имя паттерна (до 10 симв.):', patternResetConfirm:'Сбросить паттерн полностью?', euclidTrack:'EUCLID GEN (трек)',
+  kitsTitle:'KITS — банк, SysEx import/export, randomize',
+  kitCurrent:'Текущий кит: {name}{slot} · в банке {count} китов. Импорт принимает настоящие KIT DUMP 0x52 из .syx/.mid; паттерны и DigiPRO-волны из того же файла можно открыть через FILE → SysEx.',
+  kitPickSyx:'Выберите .syx с Monomachine: здесь появятся найденные киты и кнопки LOAD / ADD TO BANK.',
+  rndGroup:'RND · RANDOMIZE — музыкальный, не «всё на максимум»', rndKitAll:'RND · RANDOMIZE KIT — ВСЕ 6 ТРЕКОВ',
+  rndByTrack:'ПО ТРЕКАМ: выбрать / слушать / рандомизировать звук', kitBankGroup:'KIT BANK — тап загружает звуки, шаги паттерна не трогаются',
+  kitNamePrompt:'Имя кита:', deleteKit:'УДАЛИТЬ ВЫБРАННЫЙ ИЗ БАНКА', deleteKitPrompt:'Точное имя кита для удаления:',
+  songTitle:'SONG — цепочка паттернов', songOn:'SONG: ON (выкл)', songOff:'SONG: OFF (вкл)', addRowCurrent:'+ ROW (текущий)',
+  songEmpty:'Песня пуста. Добавьте строки: паттерн будет играть REP раз и перейдёт дальше (зациклено).',
+  mixerNote:'OUT=NEIB: трек не идёт в MAIN, а только в FX-машину следующего трека (как NEIGHBOR-роутинг на железке).',
+  scaleTitle:'SCALE SETUP — длина, скорость, свинг', scaleNote:'На панели: − / TAP / + (удерживайте ±). Пока открыт TEMPO-popup, ручка LEVEL тоже меняет темп — как LEVEL-энкодер на железке.',
+  preview:'▶ ПРЕДПРОСЛУШКА', semiMinus:'−1 СТ', semiPlus:'+1 СТ', lenSteps:'LEN (шаги)', arpNotes:'ARP NOTES (интервалы от ноты)',
+  noLocks:'Нет локов. Удерживайте триг (или P-LOCK EDIT) и крутите ручки — как на железке.',
+  waveTitle:'DIGIPRO WAVEFORMS — DDRW/DENS (D33–D64) + BBOX сэмплы', listen:'▶ СЛУШАТЬ', wavToSlot:'⬆ WAV → ТЕКУЩИЙ СЛОТ (single-cycle)',
+  bboxOwnSample:'BBOX: свой сэмпл вместо синтезированного барабана',
+  waveNote:'Рисуйте волну пальцем — она сразу доступна в DPRO-DDRW/DENS как D33–D64 и сохраняется в снапшоте (как DigiBank в +Drive). WAV конвертируется в single-cycle 256 сэмплов с 12-битным характером.',
+  fileTitle:'FILE / +DRIVE — проекты, SysEx, прошивка, аудио', projectDown:'⬇ ПРОЕКТ .JSON', projectUp:'⬆ ПРОЕКТ .JSON', patternMid:'⬇ ПАТТЕРН .MID',
+  fileSyxGroup:'ELEKTRON SYSEX — настоящий импорт Monomachine', importKitToKits:'⬆ IMPORT KIT В KITS',
+  fileSyxHint:'Загрузите дамп с настоящей Monomachine. Поддерживаются: KIT DUMP 0x52 → звуки/банк, PATTERN DUMP 0x67 → шаги/ноты/p-locks, DigiPRO WAVE 0x5D → DigiBank, а также raw/global/song/custom SysEx в библиотеку и отправка через Web MIDI.',
+  recordGroup:'ЗАПИСЬ ВЫХОДА', recordNote:'REC WAV пишет мастер-выход до повторного нажатия. На iPhone готовый WAV открывается через «Поделиться» — выберите «Сохранить в Файлы»; последний WAV также останется кнопкой ниже.',
+  lastWav:'⬇ ПОСЛЕДНИЙ WAV', firmwareHonestGroup:'ЧЕСТНО ПРО ПРОШИВКУ',
+  firmwareNote:'Firmware Lab примет и сохранит ваш оригинальный OS-файл, но Safari не исполнит ColdFire + два DSP56300 без специального WASM-core и native JIT. Kit/pattern SysEx импортируется по-настоящему в clean-room движок; оригинальная ОС внутри приложения не поставляется.',
+  factoryConfirm:'Сбросить всё к заводским паттернам?', transpNote:'TRSP на странице ARP транспонирует трек на лету, не трогая шаги.',
+  setupTitle:'GLOBAL / SETUP — Monomachine Web', language:'ЯЗЫК / LANGUAGE', settings:'НАСТРОЙКИ', shortcuts:'БЫСТРЫЙ ДОСТУП',
+  setupNote:'GLOBAL открывается как FUNCTION + KIT/SONG. Язык сохраняется на устройстве; интерфейс, справка и диагностика переключаются сразу.',
+  inputEnable:'🎤 INP AB: ВКЛ ВХОД', midiConnect:'MIDI: ПОДКЛЮЧИТЬ', helpGuide:'СПРАВКА + SOPHIE-РЕЦЕПТЫ', helpTitle:'СПРАВКА — игра, FX и SOPHIE-звуки',
+  sophieGroup:'SOPHIE XE — МАТЕРИАЛЫ A09–A12', sophieNote:'A09 ELASTIC, A10 PLASTIC, A11 Latex, A12 GLASSLAB. В KITS выберите THEME → SOPHIE XE для эластичных FM, пластика, стекла, squeak-шума и VO-6.',
+  backToGlobal:'← GLOBAL', wavReadyShare:'WAV ГОТОВ {time}', wavShareCanceled:'WAV СОХРАНЁН В ПАМЯТИ — FILE → ПОСЛЕДНИЙ WAV', wavFallback:'WAV REC · FALLBACK',
+  euclidDensity:'Плотность 0.1–0.9:', osUpgradeConfirm:'Похоже на OS upgrade SysEx. Отправлять на настоящую Monomachine только если она специально переведена в режим OS UPGRADE. Продолжить?',
+  syxMessages:'Сообщений: {total} · Elektron: {elektron} · Monomachine: {mnm}', syxCounts:'Kits 0x52: {kits} · Patterns 0x67: {patterns} · DigiPRO waves 0x5D: {waves} · Globals: {globals} · Songs: {songs} · поврежд.: {damaged} · неполн.: {incomplete}',
+  syxLikelyOs:'Похоже на OS/FIRMWARE package, а не на kit/pattern dump. Откройте его во Firmware Lab.', syxMore:'… ещё {n} сообщений',
+  originalSyx:'⬇ ОРИГИНАЛ .SYX', forceDecode:'⚠ FORCE DECODE (игнор. checksum)', forceDecodeNote:'FORCE DECODE: checksum игнорировалась — проверяйте звук перед сохранением.',
+  openFirmwareLab:'ОТКРЫТЬ ВО FIRMWARE LAB', allKitsFromFile:'ВСЕ КИТЫ ИЗ ФАЙЛА', kitsFound:'Найдено китов: {n}',
+  patternImportNote:'Импорт переносит trigs, notes, slides, trigless/filter/LFO trigs, p-locks, swing и длину. Звук берётся из целевого слота или связанного кита этого файла.',
+  linkedKitMissing:' (нет в файле)', openWaveEditor:'ОТКРЫТЬ WAVE EDITOR', kitDumpMissing:'KIT DUMP НЕ НАЙДЕН',
+  kitDumpMissingDetail:'Нужен Monomachine KIT DUMP (команда 0x52). Файл сохранён как raw SysEx; паттерны/волны доступны через FILE → SysEx.',
+  openFileSyx:'ОТКРЫТЬ FILE / SYSEX', parsing:'Разбираю {name}…', noSyxBinary:'SysEx-сообщений нет. Похоже на raw .bin/.img — открываю анализ во Firmware Lab.',
+  libraryDuplicate:'SysEx Library: уже был сохранён (тот же hash).', librarySaved:'SysEx Library: сохранён локально в IndexedDB.', libraryUnavailable:'SysEx Library: IndexedDB недоступна, файл только в памяти.',
+  evMono:'строка MONOMACHINE', evElektron:'строка ELEKTRON', evDsp:'упоминание DSP563xx', evVersion:'версия {v}', evSize:'размер похож на OS package', evManyPackets:'много SysEx-пакетов без kit/pattern dumps',
+  fwDump:'SysEx dump (не OS)', fwLikely:'Очень похож на Monomachine OS/firmware', fwPossible:'Возможно firmware/upgrade package', fwUnknown:'Неизвестный бинарный файл',
+  fwSize:'Размер: {n} bytes ({pretty})', hashUnavailable:'недоступен в этом контексте', fwEntropy:'Энтропия: {v} bit/byte', fwType:'Тип: {kind}', fwSigns:'Признаки: {items}', fwContainer:'Контейнер: {kind}',
+  fwFirstWords:'Первые BE32 слова: {words}', fwMarkers:'СТРОКИ / МАРКЕРЫ:', fwNoMarkers:'(явных ASCII-маркеров не найдено — код может быть упакован)',
+  fwVaultDuplicate:'Firmware Vault: файл уже сохранён локально.', fwVaultSaved:'Firmware Vault: сохранён локально в IndexedDB (никуда не отправляется).', fwVaultUnavailable:'Firmware Vault: IndexedDB недоступна.',
+  bootLine1:'1) Контейнер принят, файл не изменён.', bootLineDump:'2) Внутри есть kit/pattern/wave dumps — это данные, не исполняемая ОС.', bootLineNoDump:'2) Kit/pattern dumps не найдены; ищу CPU/DSP entry points…',
+  bootLine3:'3) Нужны одновременно: ColdFire/M68K control CPU + 2× DSP56300 + timers/DMA/codec/MIDI/display.',
+  bootLine4:'4) Совместимого Safari/WebAssembly Monomachine-core в приложении нет; iOS Safari также не даёт сторонний native JIT.',
+  bootResult:'РЕЗУЛЬТАТ: BOOT BLOCKED — файл сохранён и готов для будущего WASM-core, но оригинальная ОС сейчас честно НЕ запущена.',
+  openAsSyxImport:'ОТКРЫТЬ КАК SYSEX IMPORT', readingStorage:'Читаю локальное хранилище…',
+  idbUnavailableMode:'IndexedDB недоступна в этом режиме браузера (например, file:// или приватный режим). Импорт в текущей сессии всё равно работает.',
+  firmwareVaultEmpty:'Firmware Vault пуст.', sysexLibraryEmpty:'SysEx Library пуста.', sysexLibTitle:'SYSEX LIBRARY — локально сохранённые .syx',
+  sysexLibNote:'Файлы хранятся только в IndexedDB этого браузера/приложения. OPEN / IMPORT заново разбирает kits, patterns и DigiPRO waves; оригинал можно скачать без изменений или отправить через Web MIDI на десктопе.',
+  yes:'есть', no:'нет', awNotVisible:'не видна до запуска аудио', noMidiIphone:'нет (iPhone Safari)', nativeJitLine:'Native JIT для DSP56300: недоступен веб-странице iOS',
+  firmwareTitle:'FIRMWARE LAB — оригинальная OS Monomachine',
+  firmwareIntro:'Сюда можно вставить ваш собственный OS-файл Elektron (.syx upgrade или raw .bin/.img). Приложение сохранит его локально, посчитает SHA-256/CRC32, найдёт версию/маркеры и проверит контейнер. Внутри приложения нет прошивки Elektron и нет готового Safari/WASM ядра ColdFire+2×DSP56300, поэтому BOOT TEST честно остановится на отсутствующем core — это не фейковый «запуск».',
+  loadOsPrompt:'Загрузите OS-файл или выберите сохранённый ниже.',
+  firmwareDesktopNote:'Для настоящего бит-в-бит запуска сегодня нужен десктопный путь: Monomodule или Gearmulator MD/MM берут пользовательский OS-файл и исполняют DSP-код нативно. Native iOS-сборки используют медленный DSP-интерпретатор вне Safari. Этот Lab — слот хранения/диагностики, к которому можно будет подключить будущий WASM-core без переписывания интерфейса.',
+  audioNotLoaded:'audio.js не загрузился', stateNotLoaded:'js/state.js не загрузился', audioNotLoadedPanel:'js/audio.js не загрузился; показываю панель без звука'
+},
+en:{
+  close:'Close', recordMasterWav:'Record the master output to WAV', starting:'START…', saving:'SAVING…',
+  bootTitle:'MONOMACHINE OS DID NOT START', bootText:'The panel is shown statically, but the engine did not come alive. If this page was opened from Files, Telegram/preview, or an old Home Screen icon, open the published link in Safari instead. JavaScript and Web Audio may be disabled in Quick Look.', bootDiag:'Diagnostics will appear if JavaScript is available. If you see this text without data, enable JavaScript in Safari.', bootReload:'RELOAD', bootCache:'RESET PWA CACHE',
+  machineTitle:'KIT EDIT — MACHINE T{n} (SYN resets, as on hardware)',
+  machineFxNote:'FX machines process NEIB (previous track) / INP (input) / BUS — choose the input with knob H (INP) on the SYN page. Trigs on the FX track gate the AMP envelope, as on the original. In MIXER you can route a track to NEIB only (no MAIN).',
+  patternTitle:'PATTERN — banks A–H × 16 (128 patterns)', patternNamePrompt:'Pattern name (up to 10 chars):', patternResetConfirm:'Reset this pattern completely?', euclidTrack:'EUCLID GEN (track)',
+  kitsTitle:'KITS — bank, SysEx import/export, randomize',
+  kitCurrent:'Current kit: {name}{slot} · {count} kits in the bank. Import accepts real KIT DUMP 0x52 data from .syx/.mid; patterns and DigiPRO waves from the same file can be opened via FILE → SysEx.',
+  kitPickSyx:'Choose a Monomachine .syx file: found kits and LOAD / ADD TO BANK actions will appear here.',
+  rndGroup:'RND · RANDOMIZE — musical, not “everything at maximum”', rndKitAll:'RND · RANDOMIZE KIT — ALL 6 TRACKS',
+  rndByTrack:'BY TRACK: select / audition / randomize sound', kitBankGroup:'KIT BANK — tap loads sounds; pattern steps are untouched',
+  kitNamePrompt:'Kit name:', deleteKit:'DELETE SELECTED FROM BANK', deleteKitPrompt:'Exact kit name to delete:',
+  songTitle:'SONG — pattern chain', songOn:'SONG: ON (turn off)', songOff:'SONG: OFF (turn on)', addRowCurrent:'+ ROW (current)',
+  songEmpty:'The song is empty. Add rows: each pattern plays REP times and then moves on (looped).',
+  mixerNote:'OUT=NEIB: the track does not go to MAIN; it only feeds the FX machine on the next track (hardware NEIGHBOR routing).',
+  scaleTitle:'SCALE SETUP — length, speed, swing', scaleNote:'On the panel: − / TAP / + (hold ± to repeat). While the TEMPO popup is open, the LEVEL knob also changes tempo — like the LEVEL encoder on hardware.',
+  preview:'▶ PREVIEW', semiMinus:'−1 ST', semiPlus:'+1 ST', lenSteps:'LEN (steps)', arpNotes:'ARP NOTES (intervals from the note)',
+  noLocks:'No locks yet. Hold a trig (or use P-LOCK EDIT) and turn the knobs — as on hardware.',
+  waveTitle:'DIGIPRO WAVEFORMS — DDRW/DENS (D33–D64) + BBOX samples', listen:'▶ LISTEN', wavToSlot:'⬆ WAV → CURRENT SLOT (single-cycle)',
+  bboxOwnSample:'BBOX: your own sample instead of the synthesized drum',
+  waveNote:'Draw the wave with your finger — it is immediately available in DPRO-DDRW/DENS as D33–D64 and stored in the snapshot (like DigiBank on +Drive). WAV files are converted to a 256-sample single cycle with 12-bit character.',
+  fileTitle:'FILE / +DRIVE — projects, SysEx, firmware, audio', projectDown:'⬇ PROJECT .JSON', projectUp:'⬆ PROJECT .JSON', patternMid:'⬇ PATTERN .MID',
+  fileSyxGroup:'ELEKTRON SYSEX — real Monomachine import', importKitToKits:'⬆ IMPORT KIT IN KITS',
+  fileSyxHint:'Load a dump from a real Monomachine. Supported: KIT DUMP 0x52 → sounds/bank, PATTERN DUMP 0x67 → steps/notes/p-locks, DigiPRO WAVE 0x5D → DigiBank, plus raw/global/song/custom SysEx in the library and sending via Web MIDI.',
+  recordGroup:'OUTPUT RECORDING', recordNote:'REC WAV records the master output until you press it again. On iPhone the finished WAV opens in Share — choose “Save to Files”; the latest WAV also remains available with the button below.',
+  lastWav:'⬇ LAST WAV', firmwareHonestGroup:'ABOUT FIRMWARE, HONESTLY',
+  firmwareNote:'Firmware Lab accepts and stores your original OS file, but Safari cannot execute a ColdFire + two DSP56300 system without a dedicated WASM core and native JIT. Kit/pattern SysEx is imported for real into the clean-room engine; no original Elektron OS is included in the app.',
+  factoryConfirm:'Reset everything to the factory patterns?', transpNote:'TRSP on the ARP page transposes the track live without changing its steps.',
+  setupTitle:'GLOBAL / SETUP — Monomachine Web', language:'LANGUAGE / ЯЗЫК', settings:'SETTINGS', shortcuts:'SHORTCUTS',
+  setupNote:'GLOBAL is FUNCTION + KIT/SONG. The language is saved on this device; the interface, help and diagnostics switch immediately.',
+  inputEnable:'🎤 INP AB: ENABLE INPUT', midiConnect:'MIDI: CONNECT', helpGuide:'HELP + SOPHIE RECIPES', helpTitle:'HELP — playing, FX and SOPHIE-style sounds',
+  sophieGroup:'SOPHIE XE — MATERIALS A09–A12', sophieNote:'A09 ELASTIC, A10 PLASTIC, A11 Latex, A12 GLASSLAB. In KITS choose THEME → SOPHIE XE for elastic FM, plastic, glass, squeaky noise and VO-6 materials.',
+  backToGlobal:'← GLOBAL', wavReadyShare:'WAV READY {time}', wavShareCanceled:'WAV KEPT IN MEMORY — FILE → LAST WAV', wavFallback:'WAV REC · FALLBACK',
+  euclidDensity:'Density 0.1–0.9:', osUpgradeConfirm:'This looks like an OS upgrade SysEx file. Send it to a real Monomachine only when the machine has explicitly been put into OS UPGRADE mode. Continue?',
+  syxMessages:'Messages: {total} · Elektron: {elektron} · Monomachine: {mnm}', syxCounts:'Kits 0x52: {kits} · Patterns 0x67: {patterns} · DigiPRO waves 0x5D: {waves} · Globals: {globals} · Songs: {songs} · damaged: {damaged} · incomplete: {incomplete}',
+  syxLikelyOs:'This looks like an OS/FIRMWARE package, not a kit/pattern dump. Open it in Firmware Lab.', syxMore:'… {n} more messages',
+  originalSyx:'⬇ ORIGINAL .SYX', forceDecode:'⚠ FORCE DECODE (ignore checksum)', forceDecodeNote:'FORCE DECODE: the checksum was ignored — audition the result before saving it.',
+  openFirmwareLab:'OPEN IN FIRMWARE LAB', allKitsFromFile:'ALL KITS IN FILE', kitsFound:'Kits found: {n}',
+  patternImportNote:'Import transfers trigs, notes, slides, trigless/filter/LFO trigs, p-locks, swing and length. Sound comes from the target slot or from the linked kit in this file.',
+  linkedKitMissing:' (not in file)', openWaveEditor:'OPEN WAVE EDITOR', kitDumpMissing:'NO KIT DUMP FOUND',
+  kitDumpMissingDetail:'A Monomachine KIT DUMP (command 0x52) is required. The file was stored as raw SysEx; patterns/waves are available via FILE → SysEx.',
+  openFileSyx:'OPEN FILE / SYSEX', parsing:'Parsing {name}…', noSyxBinary:'No SysEx messages found. This looks like a raw .bin/.img file — opening analysis in Firmware Lab.',
+  libraryDuplicate:'SysEx Library: already saved (same hash).', librarySaved:'SysEx Library: saved locally in IndexedDB.', libraryUnavailable:'SysEx Library: IndexedDB is unavailable; the file is only in memory.',
+  evMono:'MONOMACHINE string', evElektron:'ELEKTRON string', evDsp:'DSP563xx mention', evVersion:'version {v}', evSize:'size looks like an OS package', evManyPackets:'many SysEx packets without kit/pattern dumps',
+  fwDump:'SysEx dump (not an OS)', fwLikely:'Very likely a Monomachine OS/firmware file', fwPossible:'Possibly a firmware/upgrade package', fwUnknown:'Unknown binary file',
+  fwSize:'Size: {n} bytes ({pretty})', hashUnavailable:'unavailable in this context', fwEntropy:'Entropy: {v} bit/byte', fwType:'Type: {kind}', fwSigns:'Evidence: {items}', fwContainer:'Container: {kind}',
+  fwFirstWords:'First BE32 words: {words}', fwMarkers:'STRINGS / MARKERS:', fwNoMarkers:'(no obvious ASCII markers found — the code may be packed)',
+  fwVaultDuplicate:'Firmware Vault: this file is already saved locally.', fwVaultSaved:'Firmware Vault: saved locally in IndexedDB (it is not sent anywhere).', fwVaultUnavailable:'Firmware Vault: IndexedDB is unavailable.',
+  bootLine1:'1) Container accepted; the file was not modified.', bootLineDump:'2) It contains kit/pattern/wave dumps — data, not an executable OS.', bootLineNoDump:'2) No kit/pattern dumps found; looking for CPU/DSP entry points…',
+  bootLine3:'3) It would need all of these at once: ColdFire/M68K control CPU + 2× DSP56300 + timers/DMA/codec/MIDI/display.',
+  bootLine4:'4) The app has no compatible Safari/WebAssembly Monomachine core; iOS Safari also does not allow a third-party native JIT.',
+  bootResult:'RESULT: BOOT BLOCKED — the file is stored and ready for a future WASM core, but the original OS is honestly NOT running now.',
+  openAsSyxImport:'OPEN AS SYSEX IMPORT', readingStorage:'Reading local storage…',
+  idbUnavailableMode:'IndexedDB is unavailable in this browser mode (for example file:// or private mode). Import during the current session still works.',
+  firmwareVaultEmpty:'Firmware Vault is empty.', sysexLibraryEmpty:'SysEx Library is empty.', sysexLibTitle:'SYSEX LIBRARY — locally saved .syx files',
+  sysexLibNote:'Files are stored only in this browser/app IndexedDB. OPEN / IMPORT parses kits, patterns and DigiPRO waves again; the original can be downloaded unchanged or sent via Web MIDI on desktop.',
+  yes:'yes', no:'no', awNotVisible:'not visible before audio starts', noMidiIphone:'no (iPhone Safari)', nativeJitLine:'Native JIT for DSP56300: unavailable to an iOS web page',
+  firmwareTitle:'FIRMWARE LAB — original Monomachine OS',
+  firmwareIntro:'Insert your own Elektron OS file here (.syx upgrade or raw .bin/.img). The app stores it locally, calculates SHA-256/CRC32, finds version/markers and checks the container. The app contains no Elektron firmware and no ready Safari/WASM ColdFire+2×DSP56300 core, so BOOT TEST honestly stops at the missing core — it is not a fake “boot”.',
+  loadOsPrompt:'Load an OS file or choose a saved one below.',
+  firmwareDesktopNote:'For a real bit-accurate run today you need the desktop path: Monomodule or Gearmulator MD/MM take a user-supplied OS file and execute DSP code natively. Native iOS builds use a slow DSP interpreter outside Safari. This Lab is the storage/diagnostic slot to which a future WASM core can be attached without rewriting the interface.',
+  audioNotLoaded:'audio.js did not load', stateNotLoaded:'js/state.js did not load', audioNotLoadedPanel:'js/audio.js did not load; showing the panel without sound'
+}};
+function uiLang(){ return (typeof S!=='undefined'&&S&&S.lang==='en')?'en':'ru'; }
+function L(key,vars){
+  let out=(I18N[uiLang()]&&I18N[uiLang()][key])||I18N.ru[key]||key;
+  if(vars) Object.keys(vars).forEach(k=>{ out=out.split('{'+k+'}').join(String(vars[k])); });
+  return out;
+}
+function applyStaticLanguage(){
+  if(document.documentElement) document.documentElement.lang=uiLang();
+  document.querySelectorAll('[data-i18n]').forEach(elm=>{ elm.textContent=L(elm.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-title]').forEach(elm=>{ elm.title=L(elm.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(elm=>{ elm.setAttribute('aria-label',L(elm.dataset.i18nAria)); });
+  const wav=$('#wavRecBtn'); if(wav) wav.title=L('recordMasterWav');
+  const close=$('#sheetClose'); if(close) close.setAttribute('aria-label',L('close'));
+}
+function setLanguage(lang){
+  if(!hasState()) return;
+  S.lang=lang==='en'?'en':'ru';
+  try{ localStorage.setItem('monomachine_lang',S.lang); }catch(e){}
+  applyStaticLanguage(); saveSoon();
+  if(sheetType&&SHEETS[sheetType]) openSheet(sheetType);
+  renderAll(); updateWavRecUI();
+  showMsg(S.lang==='en'?'ENGLISH':'РУССКИЙ',1200);
+}
+/* Reliable hardware-style tap: native click can be cancelled when a finger
+   moves a few pixels inside the scrollable iPhone panel, so a small, quick
+   pointerup inside the button also fires (deduplicated against click). */
+let _lastFastTap={t:0,x:0,y:0};
+function bindFastTap(elm,fn){
+  if(!elm||typeof fn!=='function') return elm;
+  let start=null,suppressNextClick=false,suppressTimer=null;
+  const fire=e=>fn.call(elm,e);
+  elm.addEventListener('pointerdown',e=>{
+    // A fresh physical press is not the compatibility click from the last one.
+    suppressNextClick=false; _lastFastTap.t=0;
+    if(suppressTimer) clearTimeout(suppressTimer);
+    start={id:e.pointerId,x:e.clientX,y:e.clientY,t:performance.now()};
+  },{passive:true});
+  elm.addEventListener('pointercancel',()=>{ start=null; },{passive:true});
+  elm.addEventListener('pointerup',e=>{
+    if(!start||e.pointerId!==start.id) return;
+    const dx=e.clientX-start.x, dy=e.clientY-start.y, dt=performance.now()-start.t;
+    const r=elm.getBoundingClientRect();
+    const inside=e.clientX>=r.left-8&&e.clientX<=r.right+8&&e.clientY>=r.top-8&&e.clientY<=r.bottom+8;
+    start=null;
+    if(inside&&dx*dx+dy*dy<=784&&dt<1100){
+      e.preventDefault();
+      suppressNextClick=true; _lastFastTap={t:performance.now(),x:e.clientX,y:e.clientY};
+      if(suppressTimer) clearTimeout(suppressTimer);
+      suppressTimer=setTimeout(()=>{ suppressNextClick=false; },2500);
+      fire(e);
+    }
+  },{passive:false});
+  elm.addEventListener('click',e=>{
+    const rebuiltClick=e.detail!==0&&performance.now()-_lastFastTap.t<900&&Math.hypot(e.clientX-_lastFastTap.x,e.clientY-_lastFastTap.y)<40;
+    if(suppressNextClick||rebuiltClick){ suppressNextClick=false; _lastFastTap.t=0; e.preventDefault(); return; }
+    fire(e);
+  });
+  return elm;
+}
 const _domCache={};
 let _lcdCtx=null,_lcdDirty=true,_knobsDirty=true,_stepsDirty=true,_lastVibrate=0;
 function cachedEl(selector){ return _domCache[selector]||(_domCache[selector]=$(selector)); }
@@ -3545,7 +3948,7 @@ function drawBoot(c,ink,bg){
   if(t>=1.03){ finishBoot(); return; }
   drawMLogoPx(c,51,5,3,ink);
   lcdPrint(c,'MONOMACHINE',64,24,{scale:2,color:ink,align:'center'});
-  lcdPrint(c,'SFX-60+ WEB OS V5.3.2',64,38,{color:ink,align:'center'});
+  lcdPrint(c,'SFX-60+ WEB OS V5.4.0',64,38,{color:ink,align:'center'});
   const blocks=clamp(Math.floor((t-0.16)/0.09),0,8);
   c.fillStyle=ink;
   for(let i=0;i<blocks;i++) c.fillRect(49+i*4,48,3,3);
@@ -3929,8 +4332,8 @@ function addLongPress(elm,fn,ms){
 function bindTransport(){
   document.addEventListener('pointerdown',()=>skipBoot(),true);
   const Q=id=>$(id);
-  Q('#startBtn').onclick=()=>togglePower();
-  const wavBtn=Q('#wavRecBtn'); if(wavBtn) wavBtn.onclick=()=>toggleWavRecording();
+  bindFastTap(Q('#startBtn'),()=>togglePower());
+  bindFastTap(Q('#wavRecBtn'),()=>toggleWavRecording());
   // FUNCTION: hold (second finger) or tap to latch for one key — brown labels
   const fb=Q('#funcBtn'); let funcDownT=0;
   fb.addEventListener('pointerdown',()=>{ funcHeld=true; funcUsedFlag=false; funcDownT=performance.now(); renderTracksPages(); });
@@ -4006,7 +4409,7 @@ function bindTransport(){
     }finally{ _playBusy=false; } };
   Q('#btnStop').onclick=()=>{ if(consumeFunc()){ doPaste(); return; }
     const stopCapture=isWavRecording(); AE.stop(); S._pausedStep=0;
-    if(stopCapture) stopWavRecording();
+    if(stopCapture) stopWavRecording({user:true});
     renderAll(); };
   // trig select (FUNC = MIDI SEQ out) & scale setup (tap = page, FUNC/hold = setup)
   Q('#trigSelBtn').onclick=()=>{ if(consumeFunc()){ S.midiOut=!S.midiOut; showMsg('MIDI SEQ OUT: '+(S.midiOut?'ON':'OFF')); } else { if(S.lockStep>=0) S.selStep=S.lockStep; openSheet('step'); } };
@@ -4014,14 +4417,14 @@ function bindTransport(){
   Q('#btnScale').onclick=()=>{ if(consumeFunc()){ openSheet('scale'); return; } const pages=Math.max(1,Math.ceil(curPat().len/16)); S.seqPage=(S.seqPage+1)%pages; S.followPage=false; showMsg('PAGE '+(S.seqPage+1)+':4'); renderAll(); };
   const lc=Q('#lcdCanvas'); if(lc) lc.addEventListener('pointerdown',()=>skipBoot());
   document.querySelectorAll('[data-sheet]').forEach(b=>b.onclick=()=>openSheet(b.dataset.sheet));
-  Q('#sheetClose').onclick=closeSheet;
+  bindFastTap(Q('#sheetClose'),closeSheet);
   Q('#sheetOverlay').addEventListener('pointerdown',e=>{ if(e.target.id==='sheetOverlay') closeSheet(); });
 }
 /* ---------- sheets ---------- */
 function openSheet(type){ sheetType=type; $('#sheetOverlay').classList.add('open'); SHEETS[type]&&SHEETS[type](); }
 function closeSheet(){ $('#sheetOverlay').classList.remove('open'); sheetType=null; renderAll(); }
 function sheetHead(t){ $('#sheetTitle').textContent=t; const b=$('#sheetBody'); b.innerHTML=''; return b; }
-function actBtn(parent,label,fn,cls){ const b=el('button','sbtn '+(cls||''),label); b.onclick=fn; parent.append(b); return b; }
+function actBtn(parent,label,fn,cls){ const b=el('button','sbtn '+(cls||''),label); b.type='button'; bindFastTap(b,fn); parent.append(b); return b; }
 function slider(parent,label,min,max,val,step,fn,fmt){
   const row=el('div','srow'); const lab=el('span','slab',label); const inp=el('input'); inp.type='range'; inp.min=min;inp.max=max;inp.step=step||1;inp.value=val;
   const out=el('span','sval',fmt?fmt(val):val); inp.oninput=()=>{ const v=parseFloat(inp.value); out.textContent=fmt?fmt(v):v; fn(v); };
@@ -4172,6 +4575,24 @@ function sanitizeTrackSound(tr,role='LEAD'){
   if(tr.machine.indexOf('FM')===0){ const i=MACH[tr.machine].syn.findIndex(d=>d&&d.n==='TONE'); if(i>=0) tr.params.SYN[i]=Math.max(tr.params.SYN[i],64); }
   if(tr.machine==='GND'&&role!=='TEXTURE'){ /* silence only by explicit machine choice outside random kit */ }
 }
+function applySophieMaterial(tr,role){
+  const Sy=tr.params.SYN, A=tr.params.AMP, F=tr.params.FILT, E=tr.params.EFX;
+  // SOPHIE XE material ranges: elastic pitch envelopes, hard FM partials,
+  // bit-reduced plastic waves, tuned stereo squeaks and glossy resonance.
+  if(tr.machine==='FMDYN'){ Sy[1]=_pick([0,4,10,117,123,127]); Sy[2]=_rndi(92,127); Sy[3]=_rndi(84,127); Sy[6]=_rndi(24,96); A[2]=role==='DRUM'||role==='BASS'?_rndi(34,72):_rndi(56,104); A[4]=_rndi(76,104); }
+  else if(tr.machine==='FMPAR'){ Sy[0]=_rndi(62,112); Sy[1]=_rndi(76,124); Sy[2]=_rndi(84,124); Sy[3]=_rndi(44,96); Sy[4]=_rndi(104,127); Sy[5]=_rndi(20,72); Sy[6]=_rndi(104,127); A[2]=_rndi(64,116); }
+  else if(tr.machine==='FMSTAT'){ Sy[2]=_rndi(84,127); Sy[3]=_rndi(24,92); Sy[5]=_rndi(24,72); Sy[6]=_rndi(76,124); }
+  else if(tr.machine==='DDRW'){ Sy[4]=_rndi(28,96); Sy[6]=_rndi(18,88); Sy[5]=_rndi(76,112); A[2]=_rndi(34,76); }
+  else if(tr.machine==='DWAVE'){ Sy[2]=_rndi(44,112); E[2]=_rndi(8,44); }
+  else if(tr.machine==='VO6'){ Sy[2]=127; Sy[4]=_rndi(0,127); Sy[5]=_rndi(18,76); Sy[6]=_rndi(88,127); }
+  else if(tr.machine==='NOIS'){ Sy[0]=_rndi(88,127); Sy[1]=_rndi(12,104); Sy[2]=127; F[3]=_rndi(58,104); A[2]=_rndi(22,58); }
+  else if(tr.machine==='SID'){ Sy[1]=_rndi(64,124); Sy[4]=_pick([52,90]); E[2]=_rndi(12,48); }
+  else if(tr.machine==='BBOX'){ Sy[0]=_rndi(72,112); Sy[4]=_chance(0.4)?_rndi(24,92):0; Sy[5]=_rndi(8,72); E[2]=_rndi(0,36); }
+  if(tr.machine==='RINGMOD'){ Sy[1]=_rndi(92,127); Sy[3]=_rndi(84,124); }
+  if(tr.machine==='FLANGER'){ Sy[1]=_rndi(76,124); Sy[4]=_rndi(76,118); Sy[5]=_rndi(92,127); }
+  if(tr.machine==='REVERB'){ Sy[0]=_rndi(72,122); Sy[3]=_rndi(42,88); }
+  if(!MACH[tr.machine].fx&&_chance(0.45)) F[3]=Math.max(F[3],_rndi(48,96));
+}
 function randomizeLFOPage(tr,page,amount){
   const P=tr.params[page],defs=PAGE_DEFS[page];
   if(amount!=='CHAOS'&&_chance(0.52)){ P[7]=0; return; }
@@ -4208,6 +4629,7 @@ function randomizeTrackSound(ti,opts={}){
     const defs=pageDef(tr,pg);
     for(let i=0;i<8;i++){ if(defs[i]) tr.params[pg][i]=randomParamRaw(defs[i],tr,pg,i,amount); }
   });
+  if((opts.theme||S._rndTheme)==='SOPHIE XE') applySophieMaterial(tr,role);
   sanitizeTrackSound(tr,role);
   refreshTrackSound(ti);
 }
@@ -4219,10 +4641,11 @@ const RND_THEMES={
   DUB:{DRUM:['BBOX','SIN'],BASS:['SIN','SAW','FMDYN'],LEAD:['DWAVE','VO6','PULS'],PAD:['ENS','DENS'],TEXTURE:['NOIS','DWAVE','VO6'],FX:['REVERB','DYNAMIX','CHORUS']},
   INDUSTRIAL:{DRUM:['BBOX','NOIS','FMDYN'],BASS:['FMDYN','SAW','SID'],LEAD:['FMPAR','DWAVE','SID'],PAD:['ENS','DENS'],TEXTURE:['NOIS','FMSTAT','DWAVE'],FX:['RINGMOD','DYNAMIX','FLANGER']},
   VOX:{DRUM:['BBOX','NOIS'],BASS:['SIN','PULS','FMSTAT'],LEAD:['VO6','FMPAR','DWAVE'],PAD:['ENS','VO6','DENS'],TEXTURE:['VO6','NOIS','DWAVE'],FX:['REVERB','CHORUS','PHASER']},
-  MINIMAL:{DRUM:['BBOX','SIN'],BASS:['SIN','PULS','SAW'],LEAD:['DWAVE','SID','FMSTAT'],PAD:['ENS','PULS'],TEXTURE:['SIN','NOIS','DWAVE'],FX:['REVERB','CHORUS']}
+  MINIMAL:{DRUM:['BBOX','SIN'],BASS:['SIN','PULS','SAW'],LEAD:['DWAVE','SID','FMSTAT'],PAD:['ENS','PULS'],TEXTURE:['SIN','NOIS','DWAVE'],FX:['REVERB','CHORUS']},
+  'SOPHIE XE':{DRUM:['BBOX','FMDYN','NOIS'],BASS:['FMDYN','FMSTAT','SIN'],LEAD:['FMPAR','VO6','DDRW'],PAD:['DENS','ENS','FMPAR'],TEXTURE:['NOIS','VO6','DWAVE','SID'],FX:['RINGMOD','REVERB','FLANGER']}
 };
 function rndKitName(theme){
-  const words={ACID:['ACID','RAVE','303'],'FM LAB':['FM','METAL','BELL'],CHIP:['CHIP','8BIT','PIXEL'],DIGI:['DIGI','WAVE','DATA'],DUB:['DUB','ECHO','DEEP'],INDUSTRIAL:['STEEL','RUST','NOISE'],VOX:['VOX','CHOIR','TALK'],MINIMAL:['MIN','PULSE','Mono']};
+  const words={ACID:['ACID','RAVE','303'],'FM LAB':['FM','METAL','BELL'],CHIP:['CHIP','8BIT','PIXEL'],DIGI:['DIGI','WAVE','DATA'],DUB:['DUB','ECHO','DEEP'],INDUSTRIAL:['STEEL','RUST','NOISE'],VOX:['VOX','CHOIR','TALK'],MINIMAL:['MIN','PULSE','Mono'],'SOPHIE XE':['ELAST','Latex','GLASS']};
   return sanitizeKitName((_pick(words[theme]||['RND']))+' '+_pick(['KIT','LAB','SYS','MOD'])+' '+String(_rndi(10,99))).slice(0,11);
 }
 function inferKitRoles(p){
@@ -4259,7 +4682,7 @@ function randomizeKit(opts={}){
       if(machine!==tr.machine){ tr.machine=machine; tr.params=defaultParams(machine); delete tr._hwExtra; delete tr._hwType; }
     }
     if(MACH[tr.machine].fx){ tr.params.SYN[7]=0; tr.out='MAIN'; }
-    randomizeTrackSound(i,{scope:opts.scope||S._rndScope,amount:opts.amount||S._rndAmount,role});
+    randomizeTrackSound(i,{scope:opts.scope||S._rndScope,amount:opts.amount||S._rndAmount,role,theme:themeName});
     tr.level=role==='DRUM'?_rndi(92,116):role==='BASS'?_rndi(88,112):role==='FX'?_rndi(84,108):_rndi(76,106);
   });
   // Keep a readable stereo/delay picture instead of six simultaneous washes.
@@ -4275,7 +4698,7 @@ function randomizeKit(opts={}){
 }
 const SHEETS={
  machine(){
-  const b=sheetHead('KIT EDIT — MACHINE T'+(S.selTrack+1)+' (как на железке: SYN сбросится)');
+  const b=sheetHead(L('machineTitle',{n:S.selTrack+1}));
   const groups={}; MACHINES.forEach(m=>{(groups[m.g]=groups[m.g]||[]).push(m);});
   for(const g in groups){ b.append(el('div','sgroup',g)); const row=el('div','sgrid'); b.append(row);
     groups[g].forEach(m=>{ const btn=el('button','scell'+(curTrk().machine===m.id?' on':''),m.name);
@@ -4283,10 +4706,10 @@ const SHEETS={
         if(AE.started) AE.setMachine(S.selTrack);
         showMsg('T'+(S.selTrack+1)+' → '+m.name); saveSoon(); openSheet('machine'); renderAll(); audition(S.selTrack,null,0.5); };
       row.append(btn); }); }
-  const fxNote=el('p','snote','FX-машины обрабатывают NEIB (предыдущий трек) / INP (вход) / BUS — вход выбирается ручкой H (INP) на странице SYN. Триги FX-трека открывают гейт огибающей AMP, как на оригинале. В MIXER можно увести трек в NEIB (без MAIN).'); b.append(fxNote);
+  const fxNote=el('p','snote',L('machineFxNote')); b.append(fxNote);
  },
  pattern(){
-  const b=sheetHead('PATTERN — банки A–H × 16 (128 паттернов)');
+  const b=sheetHead(L('patternTitle'));
   const bankRow=el('div','sgrid'); b.append(bankRow);
   let bank=Math.floor(S.curPat/16);
   const draw=()=>{ bankRow.innerHTML=''; for(let i=0;i<8;i++){ const bb=el('button','scell'+(i===bank?' on':''),'BANK '+String.fromCharCode(65+i)); bb.onclick=()=>{bank=i;draw();}; bankRow.append(bb);} 
@@ -4299,26 +4722,26 @@ const SHEETS={
   actBtn(act,'PASTE',()=>{ if(S.clipPat){ S.patterns[S.curPat]=revivePattern(JSON.parse(JSON.stringify(S.clipPat))); if(AE.started)AE.patternChanged(); showMsg('PASTED → '+patLabel(S.curPat)); openSheet('pattern'); renderAll(); saveSoon(); } });
   actBtn(act,'CHAIN +CUR',()=>{ S.chain.push(S.curPat); showMsg('CHAIN: '+S.chain.map(patLabel).join('→')); });
   actBtn(act,'CLEAR CHAIN',()=>{ S.chain=[]; showMsg('CHAIN EMPTY'); });
-  actBtn(act,'RENAME',()=>{ const n=prompt('Имя паттерна (до 10 симв.):',curPat().name); if(n){ curPat().name=n.toUpperCase().slice(0,10); openSheet('pattern'); renderAll(); saveSoon(); } });
+  actBtn(act,'RENAME',()=>{ const n=prompt(L('patternNamePrompt'),curPat().name); if(n){ curPat().name=n.toUpperCase().slice(0,10); openSheet('pattern'); renderAll(); saveSoon(); } });
   actBtn(act,'CLEAR STEPS',()=>{ curPat().tracks.forEach(t=>t.steps=Array.from({length:64},mkStep)); showMsg('STEPS CLEARED'); renderAll(); saveSoon(); },'danger');
-  actBtn(act,'INIT PATTERN',()=>{ if(confirm('Сбросить паттерн полностью?')){ const nm=curPat().name; S.patterns[S.curPat]=mkPattern(nm); if(AE.started)AE.patternChanged(); openSheet('pattern'); renderAll(); saveSoon(); } },'danger');
+  actBtn(act,'INIT PATTERN',()=>{ if(confirm(L('patternResetConfirm'))){ const nm=curPat().name; S.patterns[S.curPat]=mkPattern(nm); if(AE.started)AE.patternChanged(); openSheet('pattern'); renderAll(); saveSoon(); } },'danger');
   const act2=el('div','srow'); b.append(act2);
-  actBtn(act2,'EUCLID GEN (трек)',()=>{ euclidGen(); });
+  actBtn(act2,L('euclidTrack'),()=>{ euclidGen(); });
   actBtn(act2,'TRANSPOSE +1',()=>transpose(1)); actBtn(act2,'TRANSPOSE −1',()=>transpose(-1));
  },
  kit(){
-  const b=sheetHead('KITS — банк, SysEx import/export, randomize');
+  const b=sheetHead(L('kitsTitle'));
   const p=curPat();
-  b.append(el('p','snote','Текущий кит: '+p.kit+(p._hwKit?' · Monomachine SysEx slot '+(((p._hwKit.position||0)+1)):'')+' · в банке '+S.kits.length+' китов. Импорт принимает настоящие KIT DUMP 0x52 из .syx/.mid; паттерны и DigiPRO-волны из того же файла можно открыть через FILE → SysEx.'));
+  b.append(el('p','snote',L('kitCurrent',{name:p.kit,slot:p._hwKit?' · Monomachine SysEx slot '+(((p._hwKit.position||0)+1)):'',count:S.kits.length})));
   const io=el('div','srow'); b.append(io);
   actBtn(io,'⬆ IMPORT KIT .SYX',()=>pickSysExFile({context:'kit',body:b}));
   actBtn(io,'⬇ CURRENT KIT .SYX',()=>downloadCurrentKitSyx());
   actBtn(io,'⬇ ALL KITS .SYX',()=>downloadAllKitsSyx());
   actBtn(io,'SYSEX LIBRARY',()=>openSheet('sysexlib'));
-  const importOut=el('pre','syxout','Выберите .syx с Monomachine: здесь появятся найденные киты и кнопки LOAD / ADD TO BANK.'); importOut.id='kitSyxOut'; b.append(importOut);
+  const importOut=el('pre','syxout',L('kitPickSyx')); importOut.id='kitSyxOut'; b.append(importOut);
   const importActions=el('div','syx-actions'); importActions.id='kitSyxActions'; b.append(importActions);
 
-  b.append(el('div','sgroup','RND · RANDOMIZE — музыкальный, не «всё на максимум»'));
+  b.append(el('div','sgroup',L('rndGroup')));
   const optionRow=(label,values,get,set)=>{
     b.append(el('div','sgroup',label));
     const g=el('div','sgrid compact-grid'); b.append(g);
@@ -4329,10 +4752,10 @@ const SHEETS={
   optionRow('MACHINES IN RANDOM KIT',['KEEP','THEME'],()=>S._rndMachines,v=>S._rndMachines=v);
   optionRow('THEME',['AUTO',...Object.keys(RND_THEMES)],()=>S._rndTheme,v=>S._rndTheme=v);
   const rndAct=el('div','srow'); b.append(rndAct);
-  actBtn(rndAct,'RND · RANDOMIZE KIT — ВСЕ 6 ТРЕКОВ',()=>{ randomizeKit(); openSheet('kit'); });
+  actBtn(rndAct,L('rndKitAll'),()=>{ randomizeKit(); openSheet('kit'); });
   actBtn(rndAct,'RND · RANDOM TRK SOUND',()=>{ snapshotUndoKit(); randomizeTrackSound(S.selTrack); renderAll(); saveSoon(); audition(S.selTrack,null,0.65); showMsg('RANDOM SND T'+(S.selTrack+1)); openSheet('kit'); });
   actBtn(rndAct,'↩ UNDO KIT',()=>{ undoKitChange(); openSheet('kit'); });
-  b.append(el('div','sgroup','ПО ТРЕКАМ: выбрать / слушать / рандомизировать звук'));
+  b.append(el('div','sgroup',L('rndByTrack')));
   const tg=el('div','track-rnd-grid'); b.append(tg);
   p.tracks.forEach((tr,i)=>{
     const cell=el('div','track-rnd'+(i===S.selTrack?' on':''));
@@ -4344,26 +4767,26 @@ const SHEETS={
     cell.append(main,row); tg.append(cell);
   });
 
-  b.append(el('div','sgroup','KIT BANK — тап загружает звуки, шаги паттерна не трогаются'));
+  b.append(el('div','sgroup',L('kitBankGroup')));
   const g=el('div','sgrid'); b.append(g);
   S.kits.forEach((k,ki)=>{ const btn=el('button','scell',k.name+(k.source==='sysex'?' · SYX':k.source==='random'?' · RND':''));
     btn.onclick=()=>{ applyKitObject(k); closeSheet(); };
     g.append(btn); });
   const act=el('div','srow'); b.append(act);
-  actBtn(act,'SAVE KIT AS…',()=>{ const n=prompt('Имя кита:',curPat().kit); if(n){ const nm=sanitizeKitName(n); const k=currentKitObject(nm); delete k.source; delete k.sourcePosition; upsertKit(k); curPat().kit=nm; showMsg('KIT SAVED '+nm); openSheet('kit'); saveSoon(); } });
+  actBtn(act,'SAVE KIT AS…',()=>{ const n=prompt(L('kitNamePrompt'),curPat().kit); if(n){ const nm=sanitizeKitName(n); const k=currentKitObject(nm); delete k.source; delete k.sourcePosition; upsertKit(k); curPat().kit=nm; showMsg('KIT SAVED '+nm); openSheet('kit'); saveSoon(); } });
   actBtn(act,'COPY TRACK SND',()=>{ S.clipTrack=kitOfTrack(curTrk()); showMsg('TRACK SOUND COPIED'); });
   actBtn(act,'PASTE SND',()=>{ if(S.clipTrack){ snapshotUndoKit(); applyTrackSound(curTrk(),S.clipTrack); refreshTrackSound(S.selTrack); renderAll(); saveSoon(); openSheet('kit'); } });
   actBtn(act,'INIT TRACK SND',()=>{ snapshotUndoKit(); const tr=curTrk(); tr.params=defaultParams(tr.machine); refreshTrackSound(S.selTrack); renderAll(); saveSoon(); openSheet('kit'); });
-  actBtn(act,'УДАЛИТЬ ВЫБРАННЫЙ ИЗ БАНКА',()=>{ const nm=prompt('Точное имя кита для удаления:',curPat().kit); if(!nm)return; const i=S.kits.findIndex(k=>k.name===sanitizeKitName(nm)); if(i>=0){ S.kits.splice(i,1); showMsg('KIT DELETED'); openSheet('kit'); saveSoon(); } else showMsg('KIT NOT FOUND'); },'danger');
+  actBtn(act,L('deleteKit'),()=>{ const nm=prompt(L('deleteKitPrompt'),curPat().kit); if(!nm)return; const i=S.kits.findIndex(k=>k.name===sanitizeKitName(nm)); if(i>=0){ S.kits.splice(i,1); showMsg('KIT DELETED'); openSheet('kit'); saveSoon(); } else showMsg('KIT NOT FOUND'); },'danger');
  },
 
  song(){
-  const b=sheetHead('SONG — цепочка паттернов');
+  const b=sheetHead(L('songTitle'));
   const tog=el('div','srow'); b.append(tog);
-  actBtn(tog, S.songMode?'SONG: ON (выкл)':'SONG: OFF (вкл)',()=>{ S.songMode=!S.songMode; S.songPos=0; S.songCount=0; if(S.songMode&&S.song.length) selectPattern(S.song[0].pat,false); openSheet('song'); });
-  actBtn(tog,'+ ROW (текущий)',()=>{ S.song.push({pat:S.curPat,rep:1}); openSheet('song'); saveSoon(); });
+  actBtn(tog, S.songMode?L('songOn'):L('songOff'),()=>{ S.songMode=!S.songMode; S.songPos=0; S.songCount=0; if(S.songMode&&S.song.length) selectPattern(S.song[0].pat,false); openSheet('song'); });
+  actBtn(tog,L('addRowCurrent'),()=>{ S.song.push({pat:S.curPat,rep:1}); openSheet('song'); saveSoon(); });
   actBtn(tog,'CLEAR SONG',()=>{ S.song=[]; openSheet('song'); saveSoon(); },'danger');
-  if(!S.song.length) b.append(el('p','snote','Песня пуста. Добавьте строки: паттерн будет играть REP раз и перейдёт дальше (зациклено).'));
+  if(!S.song.length) b.append(el('p','snote',L('songEmpty')));
   S.song.forEach((row,i)=>{ const r=el('div','srow'+(S.songMode&&i===S.songPos%Math.max(1,S.song.length)?' currow':''));
     const pb=el('button','sbtn',String(i+1).padStart(2,'0')+': '+patLabel(row.pat)+' '+pat(row.pat).name);
     pb.onclick=()=>{ row.pat=(row.pat+1)%128; openSheet('song'); saveSoon(); };
@@ -4384,10 +4807,10 @@ const SHEETS={
     actBtn(r,'OUT: '+tr.out,function(){ tr.out=tr.out==='MAIN'?'NEIB':'MAIN'; this.textContent='OUT: '+tr.out; if(AE.started)AE.applyChain(i,effParams(tr,null,i),nowT()); saveSoon(); });
     actBtn(r,'▶ AUD',()=>{ S.selTrack=i; audition(i,null,0.6); renderAll(); });
   });
-  b.append(el('p','snote','OUT=NEIB: трек не идёт в MAIN, а только в FX-машину следующего трека (как NEIGHBOR-роутинг на железке).'));
+  b.append(el('p','snote',L('mixerNote')));
  },
  scale(){
-  const b=sheetHead('SCALE SETUP — длина, скорость, свинг'); const p=curPat();
+  const b=sheetHead(L('scaleTitle')); const p=curPat();
   const g=el('div','sgrid'); b.append(g);
   [16,32,48,64].forEach(L=>{ const btn=el('button','scell'+(p.len===L?' on':''),'LEN '+L); btn.onclick=()=>{ p.len=L; showMsg('PATTERN LENGTH '+L); openSheet('scale'); renderAll(); saveSoon(); }; g.append(btn); });
   const g2=el('div','sgrid'); b.append(g2);
@@ -4401,7 +4824,7 @@ const SHEETS={
   actBtn(tempoRow,'+1',()=>tempoStep(1),'small');
   actBtn(tempoRow,'TEMPO +5',()=>tempoStep(5),'small');
   tempoSlider=slider(b,'TEMPO BPM',30,300,p.bpm,0.1,v=>{ setTempo(v); },v=>v.toFixed(1));
-  b.append(el('p','snote','На панели: − / TAP / + (удерживайте ±). Пока открыт TEMPO-popup, ручка LEVEL тоже меняет темп — как LEVEL-энкодер на железке.'));
+  b.append(el('p','snote',L('scaleNote')));
  },
  step(){
   const si=S.selStep, st=curTrk().steps[si], tr=curTrk(); st._edited=true;
@@ -4411,7 +4834,7 @@ const SHEETS={
   actBtn(r0, st.on?'TRIG: ON':'TRIG: OFF',()=>{ st.on=!st.on; if(st.on&&st.trigless==null)st.trigless=false; redraw(); renderSteps(); saveSoon(); });
   actBtn(r0, st.trigless?'TRIGLESS LOCK: ON':'TRIGLESS LOCK: OFF',()=>{ st.trigless=!st.trigless; if(st.trigless){ st.on=true; st.slide=false; } redraw(); renderSteps(); saveSoon(); });
   actBtn(r0, st.slide?'SLIDE: ON':'SLIDE: OFF',()=>{ st.slide=!st.slide; if(st.slide){ st.on=true; st.trigless=false; } redraw(); renderSteps(); saveSoon(); });
-  actBtn(r0,'▶ ПРЕДПРОСЛУШКА',()=>audition(S.selTrack,st.note,0.5,st.locks));
+  actBtn(r0,L('preview'),()=>audition(S.selTrack,st.note,0.5,st.locks));
   actBtn(r0,'P-LOCK EDIT',()=>{ S.lockStep=si; closeSheet(); showMsg('LOCK STEP '+(si+1)); });
   // note picker
   b.append(el('div','sgroup','NOTE: '+(tr.machine==='BBOX'? BBOX_DRUMS[clamp(((st.note-36)%24+24)%24,0,23)] : noteName(st.note))+' ('+st.note+')'));
@@ -4425,21 +4848,21 @@ const SHEETS={
     const r=el('div','srow'); b.append(r);
     actBtn(r,'OCT −',()=>{ st.note=clamp(st.note-12,0,127); redraw(); renderSteps(); saveSoon(); });
     actBtn(r,'OCT +',()=>{ st.note=clamp(st.note+12,0,127); redraw(); renderSteps(); saveSoon(); });
-    actBtn(r,'−1 СТ',()=>{ st.note=clamp(st.note-1,0,127); redraw(); renderSteps(); saveSoon(); });
-    actBtn(r,'+1 СТ',()=>{ st.note=clamp(st.note+1,0,127); redraw(); renderSteps(); saveSoon(); });
+    actBtn(r,L('semiMinus'),()=>{ st.note=clamp(st.note-1,0,127); redraw(); renderSteps(); saveSoon(); });
+    actBtn(r,L('semiPlus'),()=>{ st.note=clamp(st.note+1,0,127); redraw(); renderSteps(); saveSoon(); });
   }
-  slider(b,'LEN (шаги)',0.25,64,st.len,0.25,v=>{ st.len=v; saveSoon(); });
+  slider(b,L('lenSteps'),0.25,64,st.len,0.25,v=>{ st.len=v; saveSoon(); });
   slider(b,'VELOCITY',1,127,st.vel,1,v=>{ st.vel=v; saveSoon(); });
   slider(b,'PROB %',1,100,st.prob,1,v=>{ st.prob=v; saveSoon(); });
   slider(b,'RATCHET ×',1,8,st.rat,1,v=>{ st.rat=v; saveSoon(); });
   slider(b,'MICRO ±',-32,31,st.mic,1,v=>{ st.mic=v; saveSoon(); });
-  b.append(el('div','sgroup','ARP NOTES (интервалы от ноты)'));
+  b.append(el('div','sgroup',L('arpNotes')));
   const ag=el('div','sgrid'); b.append(ag);
   [0,3,4,5,7,10,11,12].forEach(iv=>{ const on=st.arp&&st.arp.includes(iv); const btn=el('button','scell small'+(on?' on':''),(iv>0?'+':'')+iv);
     btn.onclick=()=>{ if(!st.arp) st.arp=[0]; const k=st.arp.indexOf(iv); if(k>=0)st.arp.splice(k,1); else st.arp.push(iv); st.arp.sort((a,b)=>a-b); if(!st.arp.length)st.arp=null; redraw(); saveSoon(); }; ag.append(btn); });
   b.append(el('div','sgroup','PARAMETER LOCKS ('+Object.keys(st.locks).length+')'));
   const lk=Object.keys(st.locks);
-  if(!lk.length) b.append(el('p','snote','Нет локов. Удерживайте триг (или P-LOCK EDIT) и крутите ручки — как на железке.'));
+  if(!lk.length) b.append(el('p','snote',L('noLocks')));
   lk.forEach(k=>{ const [pg,idx]=k.split('.'); const defs=pageDef(tr,pg); const def=defs[+idx];
     const r=el('div','srow'); r.append(el('span','slab',pg+' '+(def?def.n:k)+' = '+(def?formatVal(def,st.locks[k]):st.locks[k])));
     actBtn(r,'✕',()=>{ delete st.locks[k]; redraw(); renderSteps(); saveSoon(); },'small danger'); b.append(r); });
@@ -4449,13 +4872,13 @@ const SHEETS={
   actBtn(act,'CLEAR LOCKS',()=>{ st.locks={}; redraw(); renderSteps(); saveSoon(); },'danger');
  },
  wave(){
-  const b=sheetHead('DIGIPRO WAVEFORMS — DDRW/DENS (D33–D64) + BBOX сэмплы');
+  const b=sheetHead(L('waveTitle'));
   let slot=32;
   const selRow=el('div','srow'); b.append(selRow);
   const selLab=el('span','slab','SLOT D33'); selRow.append(selLab);
   actBtn(selRow,'◀',()=>{ slot=clamp(slot-1,32,63); selLab.textContent='SLOT D'+(slot+1); drawWave(); },'small');
   actBtn(selRow,'▶',()=>{ slot=clamp(slot+1,32,63); selLab.textContent='SLOT D'+(slot+1); drawWave(); },'small');
-  actBtn(selRow,'▶ СЛУШАТЬ',()=>{ const tr=curTrk(); if(AE.started){ const tmp=tr.machine; /* audition via temporary DDRW on sel track if already DDRW/DENS else direct osc */ directWaveAudition(slot); } });
+  actBtn(selRow,L('listen'),()=>{ const tr=curTrk(); if(AE.started){ const tmp=tr.machine; /* audition via temporary DDRW on sel track if already DDRW/DENS else direct osc */ directWaveAudition(slot); } });
   const cv=el('canvas','wavecv'); cv.width=640; cv.height=220; b.append(cv);
   const ctx2=cv.getContext('2d');
   const getData=()=>{ if(!S.userWaves[slot]){ const d=new Float32Array(256); for(let i=0;i<256;i++)d[i]=Math.sin(i/256*2*Math.PI); S.userWaves[slot]={name:'USER D'+(slot+1),data:d}; } return S.userWaves[slot].data; };
@@ -4478,36 +4901,37 @@ const SHEETS={
   preset('SMOOTH',d=>{for(let n=0;n<3;n++)for(let i=0;i<256;i++)d[i]=(d[(i+255)%256]+d[i]*2+d[(i+1)%256])/4;});
   preset('12-BIT',d=>{for(let i=0;i<256;i++)d[i]=Math.round(d[i]*2048)/2048;});
   const up=el('div','srow'); b.append(up);
-  actBtn(up,'⬆ WAV → ТЕКУЩИЙ СЛОТ (single-cycle)',()=>pickFile('.wav,.aif,.aiff,.mp3,.m4a,audio/*',async f=>{ await importWaveFile(f,slot); drawWave(); }));
-  b.append(el('div','sgroup','BBOX: свой сэмпл вместо синтезированного барабана'));
+  actBtn(up,L('wavToSlot'),()=>pickFile('.wav,.aif,.aiff,.mp3,.m4a,audio/*',async f=>{ await importWaveFile(f,slot); drawWave(); }));
+  b.append(el('div','sgroup',L('bboxOwnSample')));
   const bg=el('div','sgrid'); b.append(bg);
   BBOX_DRUMS.forEach((dn,di)=>{ const btn=el('button','scell small',dn+((S.userSamplesBuf&&S.userSamplesBuf[di])?' ●':'')); btn.onclick=()=>pickFile('.wav,.mp3,.m4a,audio/*',async f=>{ await importSampleFile(f,di); openSheet('wave'); }); bg.append(btn); });
-  b.append(el('p','snote','Рисуйте волну пальцем — она сразу доступна в DPRO-DDRW/DENS как D'+'33–D64 и сохраняется в снапшоте (как DigiBank в +Drive). WAV конвертируется в single-cycle 256 сэмплов с 12-битным характером.'));
+  b.append(el('p','snote',L('waveNote')));
  },
  file(){
-  const b=sheetHead('FILE / +DRIVE — проекты, SysEx, прошивка, аудио');
+  const b=sheetHead(L('fileTitle'));
   const r1=el('div','srow'); b.append(r1);
-  actBtn(r1,'⬇ ПРОЕКТ .JSON',exportJSON); actBtn(r1,'⬆ ПРОЕКТ .JSON',()=>pickFile('.json,application/json',importJSON));
-  actBtn(r1,'⬇ ПАТТЕРН .MID',exportMIDI);
-  b.append(el('div','sgroup','ELEKTRON SYSEX — настоящий импорт Monomachine'));
+  actBtn(r1,L('projectDown'),exportJSON); actBtn(r1,L('projectUp'),()=>pickFile('.json,application/json',importJSON));
+  actBtn(r1,L('patternMid'),exportMIDI);
+  b.append(el('div','sgroup',L('fileSyxGroup')));
   const r2=el('div','srow'); b.append(r2);
   actBtn(r2,'⬆ IMPORT .SYX / .MID',()=>pickSysExFile({context:'file'}));
-  actBtn(r2,'⬆ IMPORT KIT В KITS',()=>openSheet('kit'));
+  actBtn(r2,L('importKitToKits'),()=>openSheet('kit'));
   actBtn(r2,'SYSEX LIBRARY',()=>openSheet('sysexlib'));
   actBtn(r2,'FIRMWARE LAB',()=>openSheet('firmware'));
-  const out=el('pre','syxout','Загрузите дамп с настоящей Monomachine. Поддерживаются: KIT DUMP 0x52 → звуки/банк, PATTERN DUMP 0x67 → шаги/ноты/p-locks, DigiPRO WAVE 0x5D → DigiBank, а также raw/global/song/custom SysEx в библиотеку и отправка через Web MIDI.'); out.id='syxOut'; b.append(out);
+  const out=el('pre','syxout',L('fileSyxHint')); out.id='syxOut'; b.append(out);
   const actions=el('div','syx-actions'); actions.id='syxActions'; b.append(actions);
   const kx=el('div','srow'); b.append(kx);
   actBtn(kx,'⬇ CURRENT KIT .SYX',downloadCurrentKitSyx);
   actBtn(kx,'⬇ ALL KITS .SYX',downloadAllKitsSyx);
-  b.append(el('div','sgroup','ЗАПИСЬ ВЫХОДА'));
+  b.append(el('div','sgroup',L('recordGroup')));
   const r3=el('div','srow'); b.append(r3);
   const recBtn=actBtn(r3,isWavRecording()?'■ STOP WAV':'● REC WAV',()=>toggleWavRecording()); recBtn.id='sheetWavRecBtn';
-  b.append(el('p','snote','Записывается мастер-выход, пока играет секвенсор. Файл сохранится в «Файлы»/Загрузки.'));
-  b.append(el('div','sgroup','ЧЕСТНО ПРО ПРОШИВКУ'));
-  b.append(el('p','snote','Firmware Lab примет и сохранит ваш оригинальный OS-файл, но Safari не исполнит ColdFire + два DSP56300 без специального WASM-core и native JIT. Kit/pattern SysEx теперь импортируется по-настоящему в clean-room движок; оригинальная ОС внутри приложения не поставляется.'));
+  if(_lastWav&&_lastWav.blob) actBtn(r3,L('lastWav'),()=>saveWavBlob(_lastWav.blob,_lastWav.name,_lastWav.duration||0,{user:true}));
+  b.append(el('p','snote',L('recordNote')));
+  b.append(el('div','sgroup',L('firmwareHonestGroup')));
+  b.append(el('p','snote',L('firmwareNote')));
   const r4=el('div','srow'); b.append(r4);
-  actBtn(r4,'FACTORY RESET',()=>{ if(confirm('Сбросить всё к заводским паттернам?')){ factoryReset(); if(AE.started)AE.patternChanged(); closeSheet(); renderAll(); showMsg('FACTORY RESET DONE'); } },'danger');
+  actBtn(r4,'FACTORY RESET',()=>{ if(confirm(L('factoryConfirm'))){ factoryReset(); if(AE.started)AE.patternChanged(); closeSheet(); renderAll(); showMsg('FACTORY RESET DONE'); } },'danger');
  },
 
  transp(){
@@ -4517,30 +4941,59 @@ const SHEETS={
   [-12,-7,-1,1,7,12].forEach(d=>actBtn(r,(d>0?'+':'')+d,()=>trkT(d),'small'));
   const r2=el('div','srow'); b.append(r2);
   actBtn(r2,'PATTERN +1',()=>transpose(1)); actBtn(r2,'PATTERN −1',()=>transpose(-1));
-  b.append(el('p','snote','TRSP на странице ARP транспонирует трек на лету, не трогая шаги.'));
+  b.append(el('p','snote',L('transpNote')));
  },
  setup(){
-  const b=sheetHead('SETUP / HELP — Monomachine Web');
-  const nav=el('div','srow'); b.append(nav);
-  actBtn(nav,'FILE / +DRIVE',()=>openSheet('file')); actBtn(nav,'WAVE / DIGIBANK',()=>openSheet('wave'));
-  actBtn(nav,'MIXER',()=>openSheet('mixer')); actBtn(nav,'SONG',()=>openSheet('song'));
-  actBtn(nav,'PATTERN',()=>openSheet('pattern')); actBtn(nav,'KIT',()=>openSheet('kit'));
-  actBtn(nav,'SYSEX LIBRARY',()=>openSheet('sysexlib')); actBtn(nav,'FIRMWARE LAB',()=>openSheet('firmware'));
+  const b=sheetHead(L('setupTitle'));
+  b.append(el('div','sgroup',L('language')));
+  const langGrid=el('div','sgrid compact-grid langGrid'); b.append(langGrid);
+  [['ru','РУССКИЙ'],['en','ENGLISH']].forEach(([code,label])=>{
+    const btn=el('button','scell langBtn'+(uiLang()===code?' on':''),label); btn.type='button';
+    bindFastTap(btn,()=>setLanguage(code)); langGrid.append(btn);
+  });
+  b.append(el('p','snote',L('setupNote')));
+
+  b.append(el('div','sgroup',L('settings')));
   const r=el('div','srow'); b.append(r);
   actBtn(r,'POLY MODE: '+(S.poly?'ON':'OFF'),function(){ S.poly=!S.poly; this.textContent='POLY MODE: '+(S.poly?'ON':'OFF'); showMsg(S.poly?'POLY ON':'MONO PER TRACK'); });
   actBtn(r,'FOLLOW PAGE: '+(S.followPage?'ON':'OFF'),function(){ S.followPage=!S.followPage; this.textContent='FOLLOW PAGE: '+(S.followPage?'ON':'OFF'); });
   actBtn(r,'MIDI OUT: '+(S.midiOut?'ON':'OFF'),function(){ S.midiOut=!S.midiOut; this.textContent='MIDI OUT: '+(S.midiOut?'ON':'OFF'); });
-  const r2=el('div','srow'); b.append(r2);
-  actBtn(r2,'🎤 INP AB: ВКЛ ВХОД',async()=>{ try{ await AE.enableInput(); showMsg('INPUT ON'); }catch(e){ showMsg('NO MIC ACCESS'); } });
-  actBtn(r2,'⌚ WAKE LOCK',async()=>{ try{ await navigator.wakeLock.request('screen'); showMsg('WAKE LOCK ON'); }catch(e){ showMsg('NO WAKE LOCK'); } });
-  actBtn(r2,'MIDI: ПОДКЛЮЧИТЬ',()=>initMIDI(true));
-  const help=el('div','help'); help.innerHTML=HELP_HTML; b.append(help);
+  const device=[]; const r2=el('div','srow'); b.append(r2);
+  if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia) device.push(actBtn(r2,L('inputEnable'),async()=>{ try{ await AE.enableInput(); showMsg('INPUT ON'); }catch(e){ showMsg('NO MIC ACCESS'); } }));
+  if('wakeLock' in navigator) device.push(actBtn(r2,'⌚ WAKE LOCK',async()=>{ try{ await navigator.wakeLock.request('screen'); showMsg('WAKE LOCK ON'); }catch(e){ showMsg('NO WAKE LOCK'); } }));
+  if(navigator.requestMIDIAccess) device.push(actBtn(r2,L('midiConnect'),()=>initMIDI(true)));
+  if(!device.length) r2.remove();
+
+  b.append(el('div','sgroup',L('sophieGroup')));
+  const sophie=el('div','sgrid compact-grid'); b.append(sophie);
+  [[8,'A09 ELASTIC'],[9,'A10 PLASTIC'],[10,'A11 Latex'],[11,'A12 GLASSLAB']].forEach(([idx,label])=>{
+    const btn=el('button','scell small'+(S.curPat===idx?' on':''),label); btn.type='button';
+    bindFastTap(btn,()=>{ selectPattern(idx,false); closeSheet(); }); sophie.append(btn);
+  });
+  b.append(el('p','snote',L('sophieNote')));
+
+  b.append(el('div','sgroup',L('shortcuts')));
+  const nav=el('div','srow'); b.append(nav);
+  actBtn(nav,'FILE / +DRIVE',()=>openSheet('file'));
+  actBtn(nav,'KITS',()=>openSheet('kit'));
+  actBtn(nav,'WAVE / DIGIBANK',()=>openSheet('wave'));
+  actBtn(nav,'MIXER',()=>openSheet('mixer'));
+  const tools=el('div','srow'); b.append(tools);
+  actBtn(tools,L('helpGuide'),()=>openSheet('help'));
+  if(_lastWav&&_lastWav.blob) actBtn(tools,L('lastWav'),()=>saveWavBlob(_lastWav.blob,_lastWav.name,_lastWav.duration||0,{user:true}));
+ },
+ help(){
+  const b=sheetHead(L('helpTitle'));
+  const top=el('div','srow'); b.append(top);
+  actBtn(top,L('backToGlobal'),()=>openSheet('setup'));
+  actBtn(top,'KITS · SOPHIE XE',()=>{ S._rndTheme='SOPHIE XE'; openSheet('kit'); });
+  const help=el('div','help'); help.innerHTML=helpHTML(); b.append(help);
  },
  sysexlib(){ renderSysExLibrarySheet(); },
  firmware(){ renderFirmwareSheet(); }
 };
 function euclidGen(){
-  const tr=curTrk(); const density=parseFloat(prompt('Плотность 0.1–0.9:','0.4')||'0.4');
+  const tr=curTrk(); const density=parseFloat(prompt(L('euclidDensity'),'0.4')||'0.4');
   const scale=[0,2,3,5,7,8,10]; const root=S.lastNote[S.selTrack]||60;
   const pulses=Math.round(clamp(density,0.05,0.95)*64);
   for(let i=0;i<64;i++){ const on=(Math.floor(i*pulses/64)!==Math.floor((i+1)*pulses/64)); const st=tr.steps[i]; st.on=on; st.trigless=false; if(on){ st.note=root+scale[Math.floor(Math.random()*scale.length)]+[0,12,-12][Math.floor(Math.random()*3)]; st.len=2; } }
@@ -4554,7 +5007,7 @@ function directWaveAudition(slot){
 /* ---------- files ---------- */
 function pickFile(accept,fn){ const inp=document.createElement('input'); inp.type='file'; inp.accept=accept; inp.style.display='none'; document.body.append(inp);
   inp.onchange=()=>{ const f=inp.files[0]; inp.remove(); if(f) fn(f); }; inp.click(); }
-function dl(name,blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.append(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},4000); }
+function dl(name,blob){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.append(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},30000); }
 function exportJSON(){ const data={app:'monomachine-web',v:1,patterns:S.patterns,kits:S.kits,song:S.song,curPat:S.curPat,userWaves:S.userWaves.map(w=>w?{name:w.name,data:Array.from(w.data)}:null)};
   dl('monomachine-project.json',new Blob([JSON.stringify(data)],{type:'application/json'})); showMsg('PROJECT EXPORTED'); }
 async function importJSON(f){ try{ const d=JSON.parse(await f.text()); if(d.app!=='monomachine-web') throw 0;
@@ -4683,7 +5136,7 @@ function importDecodedWaves(parsed){
   return n;
 }
 async function sendParsedSysEx(parsed,out){
-  if(parsed.likelyOS&&!confirm('Похоже на OS upgrade SysEx. Отправлять на настоящую Monomachine только если она специально переведена в режим OS UPGRADE. Продолжить?')) return;
+  if(parsed.likelyOS&&!confirm(L('osUpgradeConfirm'))) return;
   if(!navigator.requestMIDIAccess){ showMsg('WEB MIDI NOT AVAILABLE HERE'); return; }
   if(!AE.midiOutPort) await initMIDI(true,true);
   const port=AE.midiOutPort;
@@ -4712,10 +5165,10 @@ function renderParsedSysEx(parsed,bytes,targets,opts={}){
   const lines=[
     'FILE: '+parsed.filename+' · '+fmtBytes(parsed.size)+(parsed.fromSMF?' · SysEx extracted from Standard MIDI File':''),
     'CRC32: '+crc32Hex(bytes)+(opts.hash?'\nSHA-256: '+opts.hash:''),
-    'Сообщений: '+c.total+' · Elektron: '+c.elektron+' · Monomachine: '+c.mnm,
-    'Kits 0x52: '+c.kits+' · Patterns 0x67: '+c.patterns+' · DigiPRO waves 0x5D: '+c.waves+' · Globals: '+c.globals+' · Songs: '+c.songs+' · поврежд.: '+c.damaged+' · неполн.: '+c.incomplete
+    L('syxMessages',{total:c.total,elektron:c.elektron,mnm:c.mnm}),
+    L('syxCounts',{kits:c.kits,patterns:c.patterns,waves:c.waves,globals:c.globals,songs:c.songs,damaged:c.damaged,incomplete:c.incomplete})
   ];
-  if(parsed.likelyOS) lines.push('Похоже на OS/FIRMWARE package, а не на kit/pattern dump. Откройте его во Firmware Lab.');
+  if(parsed.likelyOS) lines.push(L('syxLikelyOs'));
   parsed.messages.slice(0,28).forEach(m=>{
     let line='#'+String(m.index).padStart(2,'0')+' '+m.manufacturer+' len='+m.length;
     if(m.device!=null) line+=' dev='+sxHex(m.device);
@@ -4727,21 +5180,21 @@ function renderParsedSysEx(parsed,bytes,targets,opts={}){
     if(m.error) line+=' ERROR '+m.error;
     lines.push(line);
   });
-  if(parsed.messages.length>28) lines.push('… ещё '+(parsed.messages.length-28)+' сообщений');
+  if(parsed.messages.length>28) lines.push(L('syxMore',{n:parsed.messages.length-28}));
   if(opts.libraryText) lines.push(opts.libraryText);
   out.textContent=lines.join('\n');
   actions.innerHTML='';
   const top=el('div','srow'); actions.append(top);
-  actBtn(top,'⬇ ОРИГИНАЛ .SYX',()=>downloadBytes(safeDownloadName(parsed.filename||'dump.syx'),bytes,'application/octet-stream'));
+  actBtn(top,L('originalSyx'),()=>downloadBytes(safeDownloadName(parsed.filename||'dump.syx'),bytes,'application/octet-stream'));
   actBtn(top,'➡ SEND VIA WEB MIDI',()=>sendParsedSysEx(parsed,out));
-  if(c.damaged) actBtn(top,'⚠ FORCE DECODE (игнор. checksum)',async()=>{
+  if(c.damaged) actBtn(top,L('forceDecode'),async()=>{
     const forced=sxParseFile(bytes,parsed.filename,{ignoreChecksum:true});
-    renderParsedSysEx(forced,bytes,targets,{...opts,hash:opts.hash,libraryText:'FORCE DECODE: checksum игнорировалась — проверяйте звук перед сохранением.'});
+    renderParsedSysEx(forced,bytes,targets,{...opts,hash:opts.hash,libraryText:L('forceDecodeNote')});
   },'danger');
-  if(parsed.likelyOS) actBtn(top,'ОТКРЫТЬ ВО FIRMWARE LAB',()=>{ _lastFirmware={name:parsed.filename,bytes:bytes.slice()}; openSheet('firmware'); });
+  if(parsed.likelyOS) actBtn(top,L('openFirmwareLab'),()=>{ _lastFirmware={name:parsed.filename,bytes:bytes.slice()}; openSheet('firmware'); });
 
   if(parsed.kits.length>1){
-    const row=sxItem(actions,'ВСЕ КИТЫ ИЗ ФАЙЛА','Найдено китов: '+parsed.kits.length);
+    const row=sxItem(actions,L('allKitsFromFile'),L('kitsFound',{n:parsed.kits.length}));
     actBtn(row,'ADD ALL → BANK',()=>{ parsed.kits.forEach(d=>upsertKit(sxKitToAppKit(d))); saveSoon(); showMsg(parsed.kits.length+' KITS ADDED'); if(sheetType==='kit')openSheet('kit'); });
   }
   parsed.kits.forEach(dec=>{
@@ -4755,11 +5208,11 @@ function renderParsedSysEx(parsed,bytes,targets,opts={}){
   });
   if(parsed.patterns.length){
     let withLinkedKit=parsed.kits.length>0;
-    const head=sxItem(actions,'PATTERNS','Импорт переносит trigs, notes, slides, trigless/filter/LFO trigs, p-locks, swing и длину. Звук берётся из целевого слота или связанного кита этого файла.');
+    const head=sxItem(actions,'PATTERNS',L('patternImportNote'));
     if(parsed.kits.length) actBtn(head,'LINKED KIT: '+(withLinkedKit?'ON':'OFF'),function(){ withLinkedKit=!withLinkedKit; this.textContent='LINKED KIT: '+(withLinkedKit?'ON':'OFF'); });
     parsed.patterns.forEach(dec=>{
       const linked=parsed.kits.find(k=>k.position===dec.kit)||null;
-      const row=sxItem(actions,'PATTERN '+patLabel(dec.position),'len '+dec.patternLength+' · swing '+(50+clamp(dec.swingAmount||0,0,30))+'% · linked kit #'+(dec.kit+1)+(linked?' ('+linked.name+')':' (нет в файле)'));
+      const row=sxItem(actions,'PATTERN '+patLabel(dec.position),'len '+dec.patternLength+' · swing '+(50+clamp(dec.swingAmount||0,0,30))+'% · linked kit #'+(dec.kit+1)+(linked?' ('+linked.name+')':L('linkedKitMissing')));
       actBtn(row,'IMPORT → '+patLabel(dec.position),()=>importDecodedPattern(dec,dec.position,withLinkedKit?linked:null));
       actBtn(row,'IMPORT → CURRENT '+patLabel(S.curPat),()=>importDecodedPattern(dec,S.curPat,withLinkedKit?linked:null));
     });
@@ -4767,11 +5220,11 @@ function renderParsedSysEx(parsed,bytes,targets,opts={}){
   if(parsed.waves.length){
     const row=sxItem(actions,'DIGIPRO WAVEFORMS',parsed.waves.map(w=>'D'+(w.slot+1)+' '+w.name+(w.checksumOk?'':' [checksum BAD]')).join(' · '));
     actBtn(row,'IMPORT WAVES → DIGIBANK',()=>importDecodedWaves(parsed));
-    actBtn(row,'ОТКРЫТЬ WAVE EDITOR',()=>openSheet('wave'));
+    actBtn(row,L('openWaveEditor'),()=>openSheet('wave'));
   }
   if(!parsed.kits.length&&opts.context==='kit'){
-    const row=sxItem(actions,'KIT DUMP НЕ НАЙДЕН','Нужен Monomachine KIT DUMP (команда 0x52). Файл сохранён как raw SysEx; паттерны/волны доступны через FILE → SysEx.');
-    actBtn(row,'ОТКРЫТЬ FILE / SYSEX',()=>openSheet('file'));
+    const row=sxItem(actions,L('kitDumpMissing'),L('kitDumpMissingDetail'));
+    actBtn(row,L('openFileSyx'),()=>openSheet('file'));
   }
 }
 function ensureSysExTargets(context){
@@ -4785,14 +5238,14 @@ function ensureSysExTargets(context){
 async function handleSysExBytes(bytes,name,opts={}){
   bytes=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes||[]);
   const targets=ensureSysExTargets(opts.context||'file');
-  if(targets.out) targets.out.textContent='Разбираю '+name+'…';
+  if(targets.out) targets.out.textContent=L('parsing',{name});
   if(targets.actions) targets.actions.innerHTML='';
   const parsed=sxParseFile(bytes,name,opts);
   _lastParsedSysEx={parsed,bytes:bytes.slice()};
   const isBinaryFirmware=parsed.counts.total===0;
   if(isBinaryFirmware){
     _lastFirmware={name,bytes:bytes.slice()};
-    if(targets.out) targets.out.textContent='SysEx-сообщений нет. Похоже на raw .bin/.img — открываю анализ во Firmware Lab.';
+    if(targets.out) targets.out.textContent=L('noSyxBinary');
     openSheet('firmware');
     return parsed;
   }
@@ -4801,7 +5254,7 @@ async function handleSysExBytes(bytes,name,opts={}){
   if(opts.skipSave!==true){
     const summary=parsed.counts.kits+' kits · '+parsed.counts.patterns+' patterns · '+parsed.counts.waves+' waves · '+parsed.counts.total+' msg';
     const saved=await saveLabFile('sysex',name,bytes,summary);
-    libraryText=saved?(saved.duplicate?'SysEx Library: уже был сохранён (тот же hash).':'SysEx Library: сохранён локально в IndexedDB.'):'SysEx Library: IndexedDB недоступна, файл только в памяти.';
+    libraryText=saved?(saved.duplicate?L('libraryDuplicate'):L('librarySaved')):L('libraryUnavailable');
   }
   renderParsedSysEx(parsed,bytes,targets,{context:opts.context||'file',hash,libraryText});
   showMsg('SYSEX: '+parsed.counts.kits+' KITS · '+parsed.counts.patterns+' PAT · '+parsed.counts.waves+' WAV',2200);
@@ -4853,29 +5306,29 @@ async function analyzeFirmwareBytes(bytes,name,opts={}){
   const be32=o=>bytes.length>=o+4?(((bytes[o]<<24)|(bytes[o+1]<<16)|(bytes[o+2]<<8)|bytes[o+3])>>>0):0;
   const firstWords=[]; for(let i=0;i<4&&bytes.length>=i*4+4;i++) firstWords.push('0x'+be32(i*4).toString(16).padStart(8,'0'));
   let score=0; const evidence=[];
-  if(interesting.some(s=>/MONOMACHINE/i.test(s))){ score+=5; evidence.push('строка MONOMACHINE'); }
-  if(interesting.some(s=>/ELEKTRON/i.test(s))){ score+=2; evidence.push('строка ELEKTRON'); }
-  if(interesting.some(s=>/DSP563/i.test(s))){ score+=3; evidence.push('упоминание DSP563xx'); }
-  if(versions.length){ score+=2; evidence.push('версия '+versions.join(', ')); }
-  if(bytes.length>300000&&bytes.length<16000000){ score+=1; evidence.push('размер похож на OS package'); }
-  if(parsed.counts.total>50&&parsed.kits.length===0&&parsed.patterns.length===0){ score+=1; evidence.push('много SysEx-пакетов без kit/pattern dumps'); }
+  if(interesting.some(s=>/MONOMACHINE/i.test(s))){ score+=5; evidence.push(L('evMono')); }
+  if(interesting.some(s=>/ELEKTRON/i.test(s))){ score+=2; evidence.push(L('evElektron')); }
+  if(interesting.some(s=>/DSP563/i.test(s))){ score+=3; evidence.push(L('evDsp')); }
+  if(versions.length){ score+=2; evidence.push(L('evVersion',{v:versions.join(', ')})); }
+  if(bytes.length>300000&&bytes.length<16000000){ score+=1; evidence.push(L('evSize')); }
+  if(parsed.counts.total>50&&parsed.kits.length===0&&parsed.patterns.length===0){ score+=1; evidence.push(L('evManyPackets')); }
   const isDump=parsed.kits.length+parsed.patterns.length+parsed.waves.length>0;
-  const kind=isDump?'SysEx dump (не OS)':score>=5?'Очень похож на Monomachine OS/firmware':score>=3?'Возможно firmware/upgrade package':'Неизвестный бинарный файл';
+  const kind=isDump?L('fwDump'):score>=5?L('fwLikely'):score>=3?L('fwPossible'):L('fwUnknown');
   const hash=await sha256Hex(bytes);
   const lines=[
-    'FIRMWARE FILE: '+name,'Размер: '+bytes.length+' bytes ('+fmtBytes(bytes.length)+')',
-    'SHA-256: '+(hash||'недоступен в этом контексте'),'CRC32: '+crc32Hex(bytes),
-    'Энтропия: '+byteEntropy(bytes).toFixed(3)+' bit/byte',
-    'Тип: '+kind+(evidence.length?'\nПризнаки: '+evidence.join(' · '):''),
-    'Контейнер: '+(sxIsSMF(bytes)?'Standard MIDI File':parsed.counts.total?'SysEx stream':'raw binary'),
+    'FIRMWARE FILE: '+name,L('fwSize',{n:bytes.length,pretty:fmtBytes(bytes.length)}),
+    'SHA-256: '+(hash||L('hashUnavailable')),'CRC32: '+crc32Hex(bytes),
+    L('fwEntropy',{v:byteEntropy(bytes).toFixed(3)}),
+    L('fwType',{kind})+(evidence.length?'\n'+L('fwSigns',{items:evidence.join(' · ')}):''),
+    L('fwContainer',{kind:sxIsSMF(bytes)?'Standard MIDI File':parsed.counts.total?'SysEx stream':'raw binary'}),
     'SysEx: '+parsed.counts.total+' msg · MNM headers found: '+headers.length+' · kits '+parsed.counts.kits+' · patterns '+parsed.counts.patterns+' · waves '+parsed.counts.waves,
-    'Первые BE32 слова: '+(firstWords.join(' ')||'—'),
-    '', 'СТРОКИ / МАРКЕРЫ:', ...(interesting.length?interesting:['(явных ASCII-маркеров не найдено — код может быть упакован)']),
+    L('fwFirstWords',{words:firstWords.join(' ')||'—'}),
+    '', L('fwMarkers'), ...(interesting.length?interesting:[L('fwNoMarkers')]),
     '', 'HEX 0x00:', hexDump(bytes,0,96)
   ];
   let saved=null;
   if(opts.skipSave!==true) saved=await saveLabFile('firmware',name,bytes,kind+(versions.length?' · OS '+versions.join(', '):''));
-  lines.push('',saved?(saved.duplicate?'Firmware Vault: файл уже сохранён локально.':'Firmware Vault: сохранён локально в IndexedDB (ни куда не отправляется).'):'Firmware Vault: IndexedDB недоступна.');
+  lines.push('',saved?(saved.duplicate?L('fwVaultDuplicate'):L('fwVaultSaved')):L('fwVaultUnavailable'));
   if(out) out.textContent=lines.join('\n');
   if(actions){
     actions.innerHTML='';
@@ -4884,17 +5337,17 @@ async function analyzeFirmwareBytes(bytes,name,opts={}){
       if(!out) return;
       const add=t=>{ out.textContent+='\n'+t; out.scrollTop=out.scrollHeight; };
       add('\nBOOT TEST:');
-      add('1) Контейнер принят, файл не изменён.');
+      add(L('bootLine1'));
       await waitMs(160);
-      add(isDump?'2) Внутри есть kit/pattern/wave dumps — это данные, не исполняемая ОС.':'2) Kit/pattern dumps не найдены; ищу CPU/DSP entry points…');
+      add(isDump?L('bootLineDump'):L('bootLineNoDump'));
       await waitMs(220);
-      add('3) Нужны одновременно: ColdFire/M68K control CPU + 2× DSP56300 + timers/DMA/codec/MIDI/display.');
-      add('4) Совместимого Safari/WebAssembly Monomachine-core в приложении нет; iOS Safari также не даёт сторонний native JIT.');
-      add('РЕЗУЛЬТАТ: BOOT BLOCKED — файл сохранён и готов для будущего WASM-core, но оригинальная ОС сейчас честно НЕ запущена.');
+      add(L('bootLine3'));
+      add(L('bootLine4'));
+      add(L('bootResult'));
       showMsg('BOOT BLOCKED: NO WASM CORE',2600);
     });
     actBtn(row,'⬇ DOWNLOAD COPY',()=>downloadBytes(safeDownloadName(name),bytes,'application/octet-stream'));
-    if(isDump) actBtn(row,'ОТКРЫТЬ КАК SYSEX IMPORT',()=>handleSysExBytes(bytes,name,{context:'file',skipSave:true}));
+    if(isDump) actBtn(row,L('openAsSyxImport'),()=>handleSysExBytes(bytes,name,{context:'file',skipSave:true}));
     actBtn(row,'FIRMWARE VAULT',()=>openSheet('firmware'));
   }
   return {parsed,strings:interesting,versions,kind,score,hash};
@@ -4905,12 +5358,12 @@ async function handleFirmwareFile(file){
 }
 function pickFirmwareFile(){ pickFile('.bin,.syx,.sysex,.img,.rom,.os,application/octet-stream',f=>handleFirmwareFile(f)); }
 async function renderStoredLabList(container,kind){
-  container.innerHTML='<p class="snote">Читаю локальное хранилище…</p>';
+  container.innerHTML=''; container.append(el('p','snote',L('readingStorage')));
   let recs=[];
   try{ recs=await labAll(kind); }
-  catch(e){ container.innerHTML='<p class="snote">IndexedDB недоступна в этом режиме браузера (например, file:// или приватный режим). Импорт в текущей сессии всё равно работает.</p>'; return; }
+  catch(e){ container.innerHTML=''; container.append(el('p','snote',L('idbUnavailableMode'))); return; }
   container.innerHTML='';
-  if(!recs.length){ container.append(el('p','snote',kind==='firmware'?'Firmware Vault пуст.':'SysEx Library пуста.')); return; }
+  if(!recs.length){ container.append(el('p','snote',kind==='firmware'?L('firmwareVaultEmpty'):L('sysexLibraryEmpty'))); return; }
   recs.forEach(rec=>{
     const d=new Date(rec.createdAt||Date.now());
     const row=sxItem(container,rec.name,fmtBytes(rec.size||0)+' · '+d.toLocaleString()+(rec.summary?' · '+rec.summary:'')+'\nHASH '+(rec.hash||'').slice(0,20)+'…');
@@ -4924,30 +5377,30 @@ async function renderStoredLabList(container,kind){
   });
 }
 function renderSysExLibrarySheet(){
-  const b=sheetHead('SYSEX LIBRARY — локально сохранённые .syx');
+  const b=sheetHead(L('sysexLibTitle'));
   const r=el('div','srow'); b.append(r);
   actBtn(r,'⬆ IMPORT NEW .SYX',()=>pickSysExFile({context:'file'}));
   actBtn(r,'FIRMWARE LAB',()=>openSheet('firmware'));
   actBtn(r,'KITS',()=>openSheet('kit'));
-  b.append(el('p','snote','Файлы хранятся только в IndexedDB этого браузера/приложения. OPEN / IMPORT заново разбирает kits, patterns и DigiPRO waves; оригинал можно скачать без изменений или отправить через Web MIDI на десктопе.'));
+  b.append(el('p','snote',L('sysexLibNote')));
   const list=el('div'); b.append(list); renderStoredLabList(list,'sysex');
 }
 function firmwareBrowserChecks(){
   const wa=typeof WebAssembly!=='undefined';
   const aw=!!(window.AudioContext&&AudioContext.prototype&&'audioWorklet' in AudioContext.prototype);
   return [
-    'WebAssembly: '+(wa?'есть':'нет'),
-    'AudioWorklet API: '+(aw?'есть':'не видна до запуска аудио'),
-    'SharedArrayBuffer: '+(typeof SharedArrayBuffer!=='undefined'?'есть':'нет'),
+    'WebAssembly: '+(wa?L('yes'):L('no')),
+    'AudioWorklet API: '+(aw?L('yes'):L('awNotVisible')),
+    'SharedArrayBuffer: '+(typeof SharedArrayBuffer!=='undefined'?L('yes'):L('no')),
     'crossOriginIsolated: '+(window.crossOriginIsolated?'true':'false'),
     'CPU threads (navigator): '+(navigator.hardwareConcurrency||'?'),
-    'Web MIDI: '+(navigator.requestMIDIAccess?'есть':'нет (iPhone Safari)'),
-    'Native JIT для DSP56300: недоступен веб-странице iOS'
+    'Web MIDI: '+(navigator.requestMIDIAccess?L('yes'):L('noMidiIphone')),
+    L('nativeJitLine')
   ].join('\n');
 }
 function renderFirmwareSheet(){
-  const b=sheetHead('FIRMWARE LAB — оригинальная OS Monomachine');
-  b.append(el('p','snote','Сюда можно вставить ваш собственный OS-файл Elektron (.syx upgrade или raw .bin/.img). Приложение сохранит его локально, посчитает SHA-256/CRC32, найдёт версию/маркеры и проверит контейнер. Внутри приложения нет прошивки Elektron и нет готового Safari/WASM ядра ColdFire+2×DSP56300, поэтому BOOT TEST честно остановится на отсутствующем core — это не фейковый «запуск».'));
+  const b=sheetHead(L('firmwareTitle'));
+  b.append(el('p','snote',L('firmwareIntro')));
   const r=el('div','srow'); b.append(r);
   actBtn(r,'⬆ LOAD ORIGINAL OS .SYX/.BIN',pickFirmwareFile);
   actBtn(r,'SYSEX LIBRARY',()=>openSheet('sysexlib'));
@@ -4955,11 +5408,11 @@ function renderFirmwareSheet(){
   b.append(el('div','sgroup','BROWSER CORE CHECK'));
   const checks=el('pre','syxout',firmwareBrowserChecks()); b.append(checks);
   b.append(el('div','sgroup','ANALYSIS'));
-  const out=el('pre','syxout','Загрузите OS-файл или выберите сохранённый ниже.'); out.id='fwOut'; b.append(out);
+  const out=el('pre','syxout',L('loadOsPrompt')); out.id='fwOut'; b.append(out);
   const actions=el('div','syx-actions'); actions.id='fwActions'; b.append(actions);
   b.append(el('div','sgroup','FIRMWARE VAULT (IndexedDB)'));
   const list=el('div'); b.append(list); renderStoredLabList(list,'firmware');
-  b.append(el('p','snote','Для настоящего бит-в-бит запуска сегодня нужен десктопный путь: Monomodule или Gearmulator MD/MM берут пользовательский OS-файл и исполняют DSP-код нативно. Native iOS-сборки используют медленный DSP-интерпретатор вне Safari. Этот Lab — слот хранения/диагностики, к которому можно будет подключить будущий WASM-core без переписывания интерфейса.'));
+  b.append(el('p','snote',L('firmwareDesktopNote')));
   if(_lastFirmware&&_lastFirmware.bytes) analyzeFirmwareBytes(_lastFirmware.bytes,_lastFirmware.name,{out,actions,skipSave:false});
 }
 /* --- MIDI export (SMF type1, p-locks -> original CC map) --- */
@@ -4989,7 +5442,7 @@ function exportMIDI(){
   showMsg('MIDI EXPORTED');
 }
 /* --- master WAV capture: REC WAV starts, REC WAV or STOP saves a real .wav --- */
-let _wavRec=null,_wavTimer=null;
+let _wavRec=null,_wavTimer=null,_wavBusy=false,_wavBusyText='',_lastWav=null;
 const WAV_MAX_SECONDS=600;
 function isWavRecording(){ return !!(_wavRec&&_wavRec.active); }
 function wavElapsed(){
@@ -5005,11 +5458,13 @@ function updateWavRecUI(){
   const b=$('#wavRecBtn');
   if(b){
     b.classList.toggle('recording',active);
+    b.classList.toggle('busy',!!_wavBusy&&!active);
     b.setAttribute('aria-pressed',active?'true':'false');
-    const l=$('#wavRecLabel'); if(l) l.textContent=active?'STOP WAV':'REC WAV';
+    if(_wavBusy) b.setAttribute('aria-busy','true'); else b.removeAttribute('aria-busy');
+    const l=$('#wavRecLabel'); if(l) l.textContent=active?'STOP WAV':(_wavBusy?(_wavBusyText||L('starting')):'REC WAV');
     const t=$('#wavRecTime'); if(t) t.textContent=time;
   }
-  const sh=$('#sheetWavRecBtn'); if(sh) sh.textContent=active?('■ STOP WAV '+time):'● REC WAV';
+  const sh=$('#sheetWavRecBtn'); if(sh) sh.textContent=active?('■ STOP WAV '+time):(_wavBusy?(_wavBusyText||L('starting')):'● REC WAV');
   if(document.body) document.body.classList.toggle('wav-recording',active);
 }
 function writeAscii(view,offset,str){ for(let i=0;i<str.length;i++) view.setUint8(offset+i,str.charCodeAt(i)); }
@@ -5042,15 +5497,62 @@ function wavFilename(){
   const d=new Date(), p=n=>String(n).padStart(2,'0');
   return 'monomachine-'+patLabel(S.curPat)+'-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())+'.wav';
 }
+function isIOSDevice(){
+  const ua=navigator.userAgent||'';
+  return /iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+}
+function rememberWav(blob,name,duration){ _lastWav={blob,name,duration:duration||0}; return _lastWav; }
+async function saveWavBlob(blob,name,duration=0,opts={}){
+  rememberWav(blob,name,duration);
+  let file=null;
+  try{ file=new File([blob],name,{type:blob.type||'audio/wav'}); }catch(e){}
+  const canShareFile=file&&navigator.canShare&&navigator.share&&(()=>{ try{return navigator.canShare({files:[file]});}catch(e){return false;} })();
+  if(opts.user&&isIOSDevice()&&canShareFile){
+    try{
+      await navigator.share({files:[file],title:name});
+      showMsg(L('wavReadyShare',{time:fmtRecTime(duration)}),2300);
+      return true;
+    }catch(e){
+      if(e&&e.name==='AbortError'){ showMsg(L('wavShareCanceled'),2600); return false; }
+      // NotAllowedError and friends fall through to a normal download.
+    }
+  }
+  dl(name,blob);
+  showMsg('WAV SAVED '+fmtRecTime(duration),2300);
+  return true;
+}
+function teardownPcmCapture(st){
+  if(!st||st.mode!=='pcm') return;
+  try{ st.proc.onaudioprocess=null; }catch(e){}
+  try{ st.source.disconnect(st.proc); }catch(e){}
+  try{ st.proc.disconnect(); st.mute.disconnect(); }catch(e){}
+}
+function startMediaCapture(ctx){
+  if(!window.MediaRecorder||!AE.streamDest||!AE.streamDest.stream) return false;
+  let mime='';
+  try{ mime=['audio/mp4','audio/webm','audio/ogg',''].find(m=>!m||MediaRecorder.isTypeSupported(m))||''; }catch(e){}
+  const mr=new MediaRecorder(AE.streamDest.stream,mime?{mimeType:mime}:undefined);
+  const st={active:true,mode:'media',recorder:mr,chunks:[],t0:performance.now(),ctx};
+  _wavRec=st;
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) st.chunks.push(e.data); };
+  mr.start(1000);
+  return true;
+}
+function armWavTimer(){
+  if(_wavTimer) clearInterval(_wavTimer);
+  _wavTimer=setInterval(updateWavRecUI,250);
+}
 async function startWavRecording(){
-  if(isWavRecording()) return;
-  if(!powered) await togglePower();
-  finishBoot();
-  if(!AE.started){ try{ await startEngine(); }catch(e){ console.error(e); } }
-  if(!AE.started||!AE.ctx){ showMsg('POWER ON FIRST'); return; }
-  if(AE.resume) await AE.resume();
-  const ctx=AE.ctx, source=AE.analyser||AE.master;
+  if(isWavRecording()||_wavBusy) return;
+  _wavBusy=true; _wavBusyText=L('starting'); updateWavRecUI();
   try{
+    if(!powered) await togglePower();
+    finishBoot();
+    if(!AE.started){ try{ await startEngine(); }catch(e){ console.error(e); } }
+    if(!AE.started||!AE.ctx){ showMsg('POWER ON FIRST'); return; }
+    if(AE.resume) await AE.resume();
+    const ctx=AE.ctx, source=AE.analyser||AE.master;
+    let started=false;
     if(ctx.createScriptProcessor&&source){
       const proc=ctx.createScriptProcessor(4096,2,2);
       const mute=ctx.createGain(); mute.gain.value=0;
@@ -5060,56 +5562,67 @@ async function startWavRecording(){
         if(!st.active) return;
         st.chunks.push(pcmChunkFromBuffer(e.inputBuffer));
         st.frames+=e.inputBuffer.length;
-        if(!st.autoStop&&st.frames/st.sampleRate>=WAV_MAX_SECONDS){ st.autoStop=true; setTimeout(stopWavRecording,0); }
+        if(!st.autoStop&&st.frames/st.sampleRate>=WAV_MAX_SECONDS){ st.autoStop=true; setTimeout(()=>stopWavRecording(),0); }
       };
       source.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
-    } else if(window.MediaRecorder&&AE.streamDest&&AE.streamDest.stream){
-      const mime=['audio/mp4','audio/webm','audio/ogg',''].find(m=>!m||MediaRecorder.isTypeSupported(m));
-      const mr=new MediaRecorder(AE.streamDest.stream,mime?{mimeType:mime}:undefined);
-      const st={active:true,mode:'media',recorder:mr,chunks:[],t0:performance.now(),ctx};
-      _wavRec=st;
-      mr.ondataavailable=e=>{ if(e.data&&e.data.size) st.chunks.push(e.data); };
-      mr.start(1000);
+      started=true;
+      // Some WKWebView builds expose ScriptProcessor but never deliver callbacks.
+      // If no PCM arrives quickly, switch this same take to MediaRecorder.
+      setTimeout(()=>{
+        if(_wavRec!==st||!st.active||st.frames>0) return;
+        teardownPcmCapture(st); st.active=false; _wavRec=null;
+        try{
+          if(startMediaCapture(ctx)){ armWavTimer(); updateWavRecUI(); showMsg(L('wavFallback')); }
+          else { if(_wavTimer)clearInterval(_wavTimer); _wavTimer=null; updateWavRecUI(); showMsg('NO WAV RECORDER'); }
+        }catch(e){ console.error(e); if(_wavTimer)clearInterval(_wavTimer); _wavTimer=null; updateWavRecUI(); showMsg('NO WAV RECORDER'); }
+      },900);
     } else {
-      throw new Error('No capture node or MediaRecorder');
+      started=startMediaCapture(ctx);
     }
-    if(_wavTimer) clearInterval(_wavTimer);
-    _wavTimer=setInterval(updateWavRecUI,250);
-    updateWavRecUI(); showMsg('WAV REC');
+    if(!started) throw new Error('No capture node or MediaRecorder');
+    armWavTimer(); updateWavRecUI(); showMsg('WAV REC');
   }catch(e){
-    console.error(e); _wavRec=null; updateWavRecUI(); showMsg('NO WAV RECORDER');
+    console.error(e); _wavRec=null; showMsg('NO WAV RECORDER');
+  }finally{
+    _wavBusy=false; _wavBusyText=''; updateWavRecUI();
   }
 }
-async function stopWavRecording(){
-  const st=_wavRec; if(!st||!st.active) return;
+async function stopWavRecording(opts={}){
+  const st=_wavRec; if(!st||!st.active||_wavBusy) return;
   const dur=wavElapsed(); st.active=false;
+  _wavBusy=true; _wavBusyText=L('saving');
   if(_wavTimer) clearInterval(_wavTimer); _wavTimer=null;
-  if(st.mode==='pcm'){
-    try{ st.proc.onaudioprocess=null; }catch(e){}
-    try{ st.source.disconnect(st.proc); }catch(e){}
-    try{ st.proc.disconnect(); st.mute.disconnect(); }catch(e){}
-    const blob=makeWavBlob(st.chunks,st.sampleRate,2);
+  updateWavRecUI();
+  try{
+    if(st.mode==='pcm'){
+      teardownPcmCapture(st);
+      const blob=makeWavBlob(st.chunks,st.sampleRate,2);
+      _wavRec=null; updateWavRecUI();
+      await saveWavBlob(blob,wavFilename(),dur,{user:!!opts.user});
+      return;
+    }
+    try{
+      if(st.recorder&&st.recorder.state!=='inactive'){
+        const stopped=new Promise(resolve=>{ st.recorder.onstop=resolve; });
+        const timed=new Promise(resolve=>setTimeout(resolve,1500));
+        st.recorder.stop(); await Promise.race([stopped,timed]);
+      }
+    }catch(e){}
+    const raw=new Blob(st.chunks,{type:(st.recorder&&st.recorder.mimeType)||'audio/webm'});
     _wavRec=null; updateWavRecUI();
-    dl(wavFilename(),blob); showMsg('WAV SAVED '+fmtRecTime(dur),2300);
-    return;
-  }
-  try{
-    const stopped=new Promise(resolve=>{ st.recorder.onstop=resolve; });
-    st.recorder.stop(); await stopped;
-  }catch(e){}
-  const raw=new Blob(st.chunks,{type:(st.recorder&&st.recorder.mimeType)||'audio/webm'});
-  _wavRec=null; updateWavRecUI();
-  try{
-    const decoded=await decodeAudioBuffer(st.ctx,await raw.arrayBuffer());
-    dl(wavFilename(),makeWavBlob([pcmChunkFromBuffer(decoded)],decoded.sampleRate,2));
-    showMsg('WAV SAVED '+fmtRecTime(dur),2300);
-  }catch(e){
-    const mt=(st.recorder&&st.recorder.mimeType)||'';
-    dl('monomachine-'+patLabel(S.curPat)+'.'+(mt.includes('mp4')?'m4a':'webm'),raw);
-    showMsg('AUDIO SAVED');
+    try{
+      const decoded=await decodeAudioBuffer(st.ctx,await raw.arrayBuffer());
+      await saveWavBlob(makeWavBlob([pcmChunkFromBuffer(decoded)],decoded.sampleRate,2),wavFilename(),dur,{user:!!opts.user});
+    }catch(e){
+      const mt=(st.recorder&&st.recorder.mimeType)||'';
+      const name='monomachine-'+patLabel(S.curPat)+'.'+(mt.includes('mp4')?'m4a':'webm');
+      rememberWav(raw,name,dur); dl(name,raw); showMsg('AUDIO SAVED');
+    }
+  }finally{
+    _wavBusy=false; _wavBusyText=''; updateWavRecUI();
   }
 }
-function toggleWavRecording(){ return isWavRecording()?stopWavRecording():startWavRecording(); }
+function toggleWavRecording(){ return isWavRecording()?stopWavRecording({user:true}):startWavRecording(); }
 function toggleRecAudio(){ return toggleWavRecording(); }
 /* ---------- MIDI ---------- */
 const CC2PAGE={}; [ ['SYN',48],['AMP',56],['FILT',72],['EFX',80],['LFO1',88],['LFO2',104],['LFO3',112] ].forEach(([pg,base])=>{ for(let i=0;i<8;i++) CC2PAGE[base+i]=[pg,i]; });
@@ -5178,16 +5691,38 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('keyup',e=>{ const k=e.key.toLowerCase(); if(k in KEYMAP){ delete _heldKeys[k]; if(AE.started)AE.noteOff(S.selTrack,S.octave*12+KEYMAP[k],nowT()); } });
 /* ---------- help ---------- */
-const HELP_HTML=`
-<h3>Что это</h3><p>Clean-room воссоздание <b>Elektron Monomachine SFX-60+ MKII</b> для браузера iPhone: все 22 машины (GND, SID-6581, SuperWave, DigiPRO, FM+, VO-6 и 7 FX), страницы SYN/AMP/FILT/EFX + 3 LFO на трек, 6 моно-треков, 64-шаговый секвенсор с parameter locks — как на железке OS 1.32. Движки и калибровка огибающих/фильтра — по мотивам открытого проекта <b>MONO2K</b> (Sequencist). Ни кода, ни сэмплов Elektron внутри нет.</p>
-<h3>Как играть</h3><p><b>PLAY</b> — старт. <b>REC</b> переключает: GRID REC (тап по тригу = нота, двойной тап = редактор шага, <b>удержание трига = P-LOCK</b>: крутите ручки A–H, значения залочатся на этот шаг, как на оригинале), LIVE REC (запись с клавиш-тригов в реальном времени), KEYS (триги — хроматическая клавиатура, OCT −/+).</p>
-<p><b>Ручки A–H</b>: тянуть вверх/вниз пальцем; двойной тап — сброс; тап — значение на LCD. Страницы выбираются списком справа от ЖК (SYNTHESIS…LFO 3), ARP — клавишей ARP. <b>TRACK 1–6</b> — выбор трека (удержание — прослушка), <b>FUNCTION + TRACK</b> — мьют. FUNCTION + любая клавиша = её коричневая подпись (COPY/CLEAR/PASTE, GLOBAL, POLY, MUTE MODE, MIDI SEQ). Клавиша MACHINE (EDIT) — смена машины, BANK — паттерны, GLOBAL (FUNC+KIT/SONG) — файлы и настройки.</p>
-<h3>Секвенсор</h3><p>128 паттернов (A01–H16), длина 16/32/48/64 и скорость 3/4–2X (SCALE), свинг, слайды, арпеджиатор на трек (страница ARP + ноты аккорда в редакторе шага), вероятность, ратчеты и микротайминг (бонус из MONO2K), SONG и CHAIN, очереди паттернов при игре. Всё автосохраняется в «+Drive» (localStorage).</p>
-<h3>FX-треки</h3><p>Поставьте FX-REVERB на T6 — она обработает NEIB (T5). Триги FX-трека гейтят сигнал огибающими; длинный триг на шаге 1 + AMP DEC=127 = постоянно открытый эффект (так сделаны демо). Вход: ручка INP; INP=INP — микрофон/линия (SETUP → INP AB, нужны наушники).</p>
-<h3>TEMPO и рандом</h3><p><b>− / TAP / +</b> слева меняют BPM сразу (удерживайте ± для быстрой прокрутки); пока открыт TEMPO-popup, ручка <b>LEVEL</b> тоже крутит темп. В <b>KITS</b>: <b>RANDOMIZE KIT</b> собирает все 6 звуков по теме и сохраняет результат в банк, <b>RANDOM TRK SOUND</b> и RND · по трекам — отдельные звуки; MUTATE мягко мутирует, CHAOS даёт широкий, но не «тихий/самоосциллирующий» диапазон. Есть UNDO KIT.</p>
-<h3>Файлы и настоящий SysEx</h3><p>FILE/KITS: импорт настоящих Monomachine <b>KIT DUMP 0x52</b> (машины, уровни, SYN/AMP/FILT/EFX/LFO и FX-routing), <b>PATTERN DUMP 0x67</b> (триги, ноты, слайды, trigless/filter/LFO-триги, p-locks), <b>DigiPRO WAVE 0x5D</b> в DigiBank, экспорт текущего/всех китов обратно в .syx, локальная SysEx Library в IndexedDB и отправка через Web MIDI (десктоп). Также проект JSON, паттерн MIDI (CC как у железки) и REC WAV.</p>
-<h3>Firmware Lab</h3><p>Во Firmware Lab можно вставить собственный оригинальный OS .syx/.bin: файл останется локально в IndexedDB, приложение посчитает hash и проверит маркеры/версию. Честно: Safari не запустит ColdFire + 2× DSP56300 без специального WASM-core/JIT, поэтому BOOT TEST пока останавливается на «нет core». На десктопе настоящий OS-файл исполняют Monomodule и Gearmulator MD/MM.</p>
-<h3>iPhone</h3><p>Интерфейс сам перестраивается под портрет и ландшафт, без уменьшения всей панели в микроскоп. Красная <b>REC WAV</b> сверху записывает мастер до повторного нажатия или STOP и сохраняет настоящий WAV. «Поделиться → На экран Домой» поставит как приложение. Звук стартует по клавише POWER вверху справа (политика iOS) — ЖК на секунду покажет логотип, как железка при включении. Web MIDI в Safari iOS недоступен — работает в Chrome на десктопе (каналы 1–6 = треки, та же CC-карта).</p>`;
+function helpHTML(){
+  if(uiLang()==='en') return `
+<h3>Start in 10 seconds</h3><p><b>POWER</b> starts audio, <b>PLAY</b> starts the sequencer. Tap a trig to place a note, double-tap it for the step editor, and <b>hold a trig while turning knobs A–H</b> to write parameter locks. Drag a knob vertically; double-tap resets it. REC cycles GRID REC → LIVE REC → KEYS.</p>
+<h3>Tracks, machines and FX</h3><p>Choose T1–T6, change the machine with MACHINE, then edit SYN/AMP/FILT/EFX/LFO/ARP. An FX machine on T6 processes T5 when INP=NEIB. For a clean insert, set T5 OUT=NEIB in MIXER, put a long trig on the FX track and set AMP DEC/HOLD high. Notes on a RINGMOD track also set its carrier pitch.</p>
+<h3>SOPHIE-style material recipes</h3>
+<ul>
+<li><b>Elastic kick/bass — FM+DYN:</b> 1FEN at an extreme (0 or 127), 1VOL/1VEN high, 2FB 40–90, short AMP DEC. P-lock 1FEN and 2FB on different steps.</li>
+<li><b>Plastic pluck — DPRO-DDRW:</b> BR1/BR2 30–90, WID slightly wide, fast AMP/FILT decay, a little EFX SRR.</li>
+<li><b>Glass/metal — FM+PAR:</b> high 1FRQ/2FRQ/3FRQ, strong 1ENV, weaker 3ENV, TONE high, long release, then REVERB.</li>
+<li><b>Squeaks — GND-NOIS:</b> STON=ON, ST wide, resonant FILT LPQ; p-lock BASE/WDTH and RED per step.</li>
+<li><b>Latex voice — VO-6:</b> V-SW=ON; p-lock VOC1/VOC2 in opposite directions and change CONS/CLEN per syllable.</li>
+<li><b>Glossy ring — FX-RINGMOD:</b> source OUT=NEIB, EXT 90–127, MIX 80–120; sequence different notes on the FX track to move the carrier.</li>
+</ul>
+<p>Ready-made studies live in <b>A09 ELASTIC</b>, <b>A10 PLASTIC</b>, <b>A11 Latex</b> and <b>A12 GLASSLAB</b>. In KITS, THEME → <b>SOPHIE XE</b> randomizes inside these material ranges instead of making generic noise.</p>
+<h3>Files and WAV</h3><p><b>REC WAV</b> records the master until pressed again (or STOP/POWER). On iPhone use Share → Save to Files; the take also remains under FILE → LAST WAV. FILE/KITS import real Monomachine KIT 0x52, PATTERN 0x67 and DigiPRO 0x5D SysEx and can export kits back to .syx.</p>
+<h3>Firmware, honestly</h3><p>Firmware Lab stores and inspects your own original OS file locally. Safari still has no compatible ColdFire + 2× DSP56300 WASM core in this app, so BOOT TEST stops instead of faking a boot. No Elektron firmware, ROM or samples are included.</p>`;
+  return `
+<h3>Старт за 10 секунд</h3><p><b>POWER</b> запускает звук, <b>PLAY</b> — секвенсор. Тап по тригу ставит ноту, двойной тап открывает редактор шага, а <b>удержание трига + ручки A–H</b> пишет parameter locks. Ручки тянутся вверх/вниз; двойной тап сбрасывает значение. REC переключает GRID REC → LIVE REC → KEYS.</p>
+<h3>Треки, машины и FX</h3><p>Выберите T1–T6, смените машину кнопкой MACHINE и редактируйте SYN/AMP/FILT/EFX/LFO/ARP. FX-машина на T6 обрабатывает T5 при INP=NEIB. Для чистого insert поставьте T5 OUT=NEIB в MIXER, длинный триг на FX-трек и высокие AMP DEC/HOLD. Ноты на треке RINGMOD также задают высоту его carrier.</p>
+<h3>SOPHIE-рецепты материалов</h3>
+<ul>
+<li><b>Эластичный kick/bass — FM+DYN:</b> 1FEN в край (0 или 127), высокие 1VOL/1VEN, 2FB 40–90, короткий AMP DEC. Лочьте 1FEN и 2FB по шагам.</li>
+<li><b>Пластиковый pluck — DPRO-DDRW:</b> BR1/BR2 30–90, WID чуть шире центра, быстрые AMP/FILT decay, немного EFX SRR.</li>
+<li><b>Стекло/металл — FM+PAR:</b> высокие 1FRQ/2FRQ/3FRQ, сильный 1ENV, слабее 3ENV, TONE вверх, длинный release и REVERB.</li>
+<li><b>Писки — GND-NOIS:</b> STON=ON, широкий ST, резонансный FILT LPQ; лочьте BASE/WDTH и RED на шагах.</li>
+<li><b>Латексный голос — VO-6:</b> V-SW=ON; лочьте VOC1/VOC2 в противоположные стороны и меняйте CONS/CLEN по слогам.</li>
+<li><b>Глянцевый ring — FX-RINGMOD:</b> источник OUT=NEIB, EXT 90–127, MIX 80–120; разные ноты FX-трека двигают carrier.</li>
+</ul>
+<p>Готовые этюды: <b>A09 ELASTIC</b>, <b>A10 PLASTIC</b>, <b>A11 Latex</b>, <b>A12 GLASSLAB</b>. В KITS тема <b>SOPHIE XE</b> рандомизирует внутри этих материальных диапазонов, а не делает случайный шум.</p>
+<h3>Файлы и WAV</h3><p><b>REC WAV</b> пишет мастер до повторного нажатия (или STOP/POWER). На iPhone: «Поделиться» → «Сохранить в Файлы»; дубль также останется в FILE → ПОСЛЕДНИЙ WAV. FILE/KITS импортируют настоящие Monomachine KIT 0x52, PATTERN 0x67 и DigiPRO 0x5D SysEx и экспортируют киты обратно в .syx.</p>
+<h3>Прошивка — честно</h3><p>Firmware Lab локально хранит и проверяет ваш собственный OS-файл. Совместимого Safari/WASM-ядра ColdFire + 2× DSP56300 в приложении пока нет, поэтому BOOT TEST останавливается, а не изображает запуск. Прошивок, ROM и сэмплов Elektron внутри нет.</p>`;
+}
 /* ---------- boot ---------- */
 async function startEngine(){
   await AE.init(); if(AE.resume) await AE.resume(); AE.patternChanged(); renderAll();
@@ -5196,9 +5731,10 @@ async function startEngine(){
 async function togglePower(){
   if(_powerBusy) return;
   _powerBusy=true;
+  const _pb=$('#startBtn'); if(_pb){ _pb.classList.add('busy'); _pb.setAttribute('aria-busy','true'); }
   try{
     if(powered){
-      if(isWavRecording()) await stopWavRecording();
+      if(isWavRecording()) await stopWavRecording({user:true});
       if(bootTimer) clearTimeout(bootTimer);
       bootTimer=null; powered=false; lcdMode='off';
       if(AE.started){ AE.stop(); if(AE.suspend) AE.suspend(); }
@@ -5212,7 +5748,7 @@ async function togglePower(){
     }catch(e){ console.error(e); bootReport('audio init',e); showMsg('AUDIO INIT ERROR — UI OK'); }
     if(powered&&AE.started&&AE.ctx&&AE.ctx.state!=='running') showMsg('AUDIO SUSPENDED — CLICK PLAY',2200);
     renderAll();
-  }finally{ _powerBusy=false; }
+  }finally{ _powerBusy=false; if(_pb){ _pb.classList.remove('busy'); _pb.removeAttribute('aria-busy'); } }
 }
 let _fitKey='';
 function fitToScreen(){
@@ -5238,8 +5774,8 @@ function bootStage(stage,fn){
 function installAudioStub(){
   if(typeof AE!=='undefined') return;
   window.AE={ctx:null,started:false,tracks:[],uiQueue:[],lfoOff:[],workletOK:false,_stopMuted:true,
-    init:async()=>{ throw new Error('audio.js не загрузился'); },resume:async()=>false,suspend:async()=>false,patternChanged(){},noteOn(){},noteOff(){},play(){},stop(){},
-    setMachine(){},applyChain(){},killTrack(){},restoreTrack(){},allNotesOff(){},enableInput:async()=>{ throw new Error('audio.js не загрузился'); }};
+    init:async()=>{ throw new Error(L('audioNotLoaded')); },resume:async()=>false,suspend:async()=>false,patternChanged(){},noteOn(){},noteOff(){},play(){},stop(){},
+    setMachine(){},applyChain(){},killTrack(){},restoreTrack(){},allNotesOff(){},enableInput:async()=>{ throw new Error(L('audioNotLoaded')); }};
 }
 let _bootStarted=false,_bootDone=false,_bootLoadRetried=false;
 function markBootOk(){
@@ -5258,14 +5794,15 @@ function bootApp(){
     return;
   }
   if(missingCore){
-    bootReport('state module missing',new Error('js/state.js не загрузился'));
+    bootReport('state module missing',new Error(L('stateNotLoaded')));
     if(window.__monoShowBootGuard) window.__monoShowBootGuard();
     return;
   }
   initUiStateFields();
-  if(typeof AE==='undefined'){ bootReport('audio module missing',new Error('js/audio.js не загрузился; показываю панель без звука')); installAudioStub(); }
+  if(typeof AE==='undefined'){ bootReport('audio module missing',new Error(L('audioNotLoadedPanel'))); installAudioStub(); }
   bootStage('pointer fallback',installPointerFallback);
   bootStage('loadSaved',loadSaved);
+  bootStage('language',applyStaticLanguage);
   bootStage('validate current pattern',()=>{ curPat(); });
   bootStage('buildStatic',buildStatic);
   bootStage('bindTransport',bindTransport);
