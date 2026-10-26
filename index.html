@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-mono-build="5.4.0">
+<html lang="ru" data-mono-build="5.5.1">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -17,11 +17,15 @@
    classifies the device, captures script failures and can retry a missing
    external module. The full app sets __monoBoot.ok when the panel is live. */
 (function(){
-  var boot={t0:Date.now(),ok:false,stage:'guard',errors:[],failed:{},loadedFrom:{},retried:false,build:'5.4.0'};
+  var boot={t0:Date.now(),ok:false,stage:'guard',errors:[],failed:{},loadedFrom:{},retried:false,build:'5.5.1'};
   window.__monoBoot=boot;
   var bootLang='ru';
   try{ var savedLang=window.localStorage&&localStorage.getItem('monomachine_lang'); if(savedLang==='en'||savedLang==='ru') bootLang=savedLang; else if(/^en\b/i.test(navigator.language||'')) bootLang='en'; }catch(e){}
   boot.lang=bootLang; document.documentElement.lang=bootLang;
+  var perfMode='auto';
+  try{ var savedPerf=window.localStorage&&localStorage.getItem('monomachine_perf'); if(savedPerf==='auto'||savedPerf==='lite'||savedPerf==='full') perfMode=savedPerf; }catch(e){}
+  boot.perfMode=perfMode; boot.perfLite=false;
+  try{ if(window.history) history.scrollRestoration='manual'; }catch(e){}
   var BT={
     ru:{no:'НЕТ',title:'MONOMACHINE OS НЕ ЗАПУСТИЛАСЬ',text:'Панель уже показана статично, но движок не ожил. Если страница открыта из «Файлы», Telegram/предпросмотра или старой иконки на экране Домой — откройте опубликованную ссылку именно в Safari. В Quick Look JavaScript и Web Audio могут быть отключены.',diag:'Диагностика появится, если JavaScript доступен. Если вы видите этот текст без данных — включите JavaScript в Safari.',reload:'ПЕРЕЗАГРУЗИТЬ',cache:'СБРОСИТЬ КЭШ PWA',close:'Закрыть диагностику',hint:'\nподсказка: хостинг не отдал JS-модули. Проверьте папку js рядом с index.html либо замените index.html однофайловой сборкой из github-onefile.',noErrors:'\nошибок скриптов не видно: возможно, файл открыт в предпросмотре без JavaScript/Web Audio.',factory:'Сбросить локальные сохранения Monomachine на этом устройстве и перезагрузить? Паттерны/киты из localStorage будут удалены.'},
     en:{no:'NO',title:'MONOMACHINE OS DID NOT START',text:'The panel is shown statically, but the engine did not come alive. If this page was opened from Files, Telegram/preview, or an old Home Screen icon, open the published link in Safari instead. JavaScript and Web Audio may be disabled in Quick Look.',diag:'Diagnostics will appear if JavaScript is available. If you see this text without data, enable JavaScript in Safari.',reload:'RELOAD',cache:'RESET PWA CACHE',close:'Close diagnostics',hint:'\nhint: the host did not serve the JS modules. Check that the js folder sits next to index.html, or replace index.html with the one-file build from github-onefile.',noErrors:'\nno script errors are visible: the file may be open in a preview without JavaScript/Web Audio.',factory:'Reset local Monomachine saves on this device and reload? Patterns/kits in localStorage will be deleted.'}
@@ -49,9 +53,13 @@
     else if(e&&e.message) window.__monoBootError('window',e.message);
   },true);
   window.addEventListener('unhandledrejection',function(e){ window.__monoBootError('promise',e&&e.reason); });
+  var viewportFrame=0;
   function deviceClass(){
     var vv=window.visualViewport;
-    var w=Math.round(vv?vv.width:(window.innerWidth||0)),h=Math.round(vv?vv.height:(window.innerHeight||0)),land=w>=h;
+    // Classify by the CSS/layout viewport, not a pinch-zoomed visual viewport.
+    var w=Math.round(window.innerWidth||document.documentElement.clientWidth||0);
+    var layoutH=window.innerHeight||0;
+    var h=Math.round(vv&&(!vv.scale||Math.abs(vv.scale-1)<0.02)?Math.min(layoutH||vv.height,vv.height):layoutH),land=w>=layoutH;
     var coarse=false,fine=false;
     try{ coarse=!!window.matchMedia('(pointer:coarse)').matches; fine=!!window.matchMedia('(pointer:fine)').matches; }catch(e){}
     var shortSide=Math.min(w,h), longSide=Math.max(w,h), kind='desktop';
@@ -59,12 +67,26 @@
     else if(coarse||(shortSide>=600&&shortSide<1200&&longSide<1700)) kind='tablet';
     if(fine&&w>=1100) kind='desktop';
     var root=document.documentElement;
-    if(h>0) root.style.setProperty('--appH',h+'px');
+    // Rotation arrives in several resize events on Safari. Never freeze the
+    // first (often intermediate) height for an entire orientation. One writer,
+    // coalesced per animation frame, follows both toolbar and rotation changes.
+    if(coarse&&h>0){
+      var appH=h+'px';
+      if(root.style.getPropertyValue('--appH')!==appH) root.style.setProperty('--appH',appH);
+    }else root.style.removeProperty('--appH');
+    var cores=(navigator.hardwareConcurrency||4), mem=(navigator.deviceMemory||0), ua=(navigator.userAgent||'');
+    var weakCpu=(cores<=2||(mem>0&&mem<=2)||(/iPad/.test(ua)&&/OS (12|13|14|15|16)_/.test(ua)&&cores<=4));
+    boot.perfLite=(perfMode==='lite'||(perfMode==='auto'&&weakCpu));
+    boot.perf=(boot.perfLite?'lite':'full')+'/'+perfMode+' cores='+cores+(mem?' mem='+mem:'');
     root.setAttribute('data-mono-build',boot.build);
-    root.className=root.className.replace(/\bdev-(phone|tablet|desktop)\b/g,'').replace(/\bdev-(portrait|landscape)\b/g,'').replace(/\s+/g,' ').trim();
-    root.className=(root.className?root.className+' ':'')+'dev-'+kind+' dev-'+(land?'landscape':'portrait');
-    boot.device=kind+(land?' landscape':' portrait')+' '+w+'x'+h;
+    root.className=root.className.replace(/\bdev-(phone|tablet|desktop)\b/g,'').replace(/\bdev-(portrait|landscape)\b/g,'').replace(/\bperf-lite\b/g,'').replace(/\s+/g,' ').trim();
+    root.className=(root.className?root.className+' ':'')+'dev-'+kind+' dev-'+(land?'landscape':'portrait')+(boot.perfLite?' perf-lite':'');
+    boot.device=kind+(land?' landscape':' portrait')+' '+w+'x'+h+' · '+boot.perf;
   }
+  window.__monoSetPerfMode=function(mode){
+    if(mode==='auto'||mode==='lite'||mode==='full'){ perfMode=mode; boot.perfMode=mode; }
+    deviceClass(); return !!boot.perfLite;
+  };
   function hasModule(name){
     if(name==='state') return typeof S!=='undefined';
     if(name==='sysex') return typeof sxParseFile==='function';
@@ -178,11 +200,22 @@
     if(f) f.onclick=window.__monoFactoryBoot;
     if(x) x.onclick=function(){ var b=document.getElementById('bootGuard'); if(b)b.hidden=true; };
     applyBootLang(); deviceClass();
+    try{ window.scrollTo(0,0); }catch(e){}
   }
   deviceClass();
-  window.addEventListener('resize',deviceClass);
-  if(window.visualViewport&&visualViewport.addEventListener) visualViewport.addEventListener('resize',deviceClass);
-  window.addEventListener('orientationchange',function(){ setTimeout(deviceClass,90); });
+  function refreshViewport(){
+    if(viewportFrame) return;
+    viewportFrame=window.requestAnimationFrame(function(){ viewportFrame=0; deviceClass(); });
+  }
+  window.__monoRefreshViewport=refreshViewport;
+  window.addEventListener('resize',refreshViewport);
+  window.addEventListener('pageshow',refreshViewport);
+  if(window.visualViewport&&visualViewport.addEventListener) visualViewport.addEventListener('resize',refreshViewport);
+  window.addEventListener('orientationchange',function(){
+    refreshViewport();
+    // Older iOS reports the new dimensions late, sometimes after its last resize.
+    setTimeout(refreshViewport,180); setTimeout(refreshViewport,450);
+  });
   var fallbackTimer=null;
   function scheduleFallback(delay){
     if(boot.ok||boot.retried||fallbackTimer) return;
@@ -489,7 +522,8 @@ body{touch-action:manipulation;-webkit-touch-callout:none}
 /* ==== iPhone-first hardware shell v4 ====
    The layout is genuinely reflowed for the phone. The old whole-panel
    transform scale is not used, so keys, LEDs and labels keep real size. */
-:root{--appH:100dvh}
+:root{--appH:100vh}
+@supports (height:100dvh){:root{--appH:100dvh}}
 body{overflow-x:hidden}
 #scaleWrap{min-height:var(--appH);overflow:visible}
 #unit{transform:none!important;min-height:var(--appH)}
@@ -1260,6 +1294,74 @@ button:focus-visible{outline:2px solid #ffb02e;outline-offset:2px}
   .sbtn{min-height:40px}.scell{min-height:38px}#sheetClose{min-height:40px}
 }
 
+/* ==== v5.5: stable first paint + iPad-5 LITE rendering ====
+   The LCD canvas already carries a 128x64 bitmap; reserving the same 2:1 box
+   in CSS prevents the black panel from changing height while Safari decodes
+   the first frames. LITE keeps the same geometry and hardware colours, but
+   removes the paint effects that are expensive on an A9-class GPU. */
+.lcdPx{aspect-ratio:2/1}
+#lcdCanvas{aspect-ratio:2/1}
+html.perf-lite *,html.perf-lite *::before,html.perf-lite *::after{animation:none!important;transition:none!important}
+html.perf-lite #unit{background:#d2cfc6!important}
+html.perf-lite #blackPanel{background:#111113!important}
+html.perf-lite #sheet{background:#ddd9ce!important}
+html.perf-lite .blackBtn,html.perf-lite .powerBtn{background:#1b1b1d!important}
+html.perf-lite .creamBtn,html.perf-lite .sbtn{background:#eee7d2!important}
+html.perf-lite .redBtn{background:#cf3c1d!important}
+html.perf-lite .trig{background:#1c1c1e!important}
+html.perf-lite .knob,html.perf-lite .mknob{background:#222224!important}
+html.perf-lite .screw{background:#9b968a!important}
+html.perf-lite #unit,html.perf-lite #blackPanel,html.perf-lite #sheet,
+html.perf-lite .blackBtn,html.perf-lite .creamBtn,html.perf-lite .redBtn,
+html.perf-lite .trig,html.perf-lite .knob,html.perf-lite .mknob,
+html.perf-lite .powerBtn,html.perf-lite .wavRecBtn,html.perf-lite .screw{box-shadow:none!important}
+html.perf-lite #blackPanel::after,html.perf-lite .lcdPx::after,html.perf-lite .pxgrid{display:none!important}
+html.perf-lite .trigcell.playing .trig,html.perf-lite .trig.held,html.perf-lite button:active{filter:none!important}
+html.perf-lite .led.on,html.perf-lite .pled.on,html.perf-lite .pagerow.on .pdot,html.perf-lite .trigcell.on .t-led{box-shadow:none!important}
+html.perf-lite .scell{background:#222224!important;color:#f0ead8!important;box-shadow:none!important}
+html.perf-lite .scell.on{background:#cf3c1d!important;color:#fff!important}
+html.perf-lite .langBtn,html.perf-lite .sbtn,html.perf-lite input,html.perf-lite select,html.perf-lite textarea{box-shadow:none!important}
+html.perf-lite .snote{background:#e8e2d2!important}
+
+/* Rotation safety: intrinsic nav widths must never spill into BANK. These
+   constraints apply to desktop too; the fixed 3x38px arrows did not flex. */
+.mbGroup,.navFlex,.navCream,.navArrows{min-width:0}
+.navFlex{display:grid;grid-template-columns:minmax(30px,.65fr) minmax(0,1.35fr);gap:6px}
+.navArrows{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+.navArrows .arrow{width:100%;height:100%;min-height:0;padding-left:0;padding-right:0}
+/* Never clip controls when a toolbar, split view or safe area leaves less
+   height than the physical panel needs. Scroll is preferable to lost trigs. */
+@media (pointer:coarse){
+  #scaleWrap{overflow:visible}
+  #unit{overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}
+}
+@media (pointer:coarse) and (min-width:821px) and (max-width:1800px) and (orientation:landscape) and (min-height:561px){
+  #scaleWrap{display:block;height:var(--appH);min-height:0;overflow:auto}
+  #unit{display:grid;grid-template-rows:40px minmax(240px,1fr) auto minmax(64px,.32fr);height:var(--appH);min-height:0;max-height:none;width:100%;max-width:1280px;gap:8px}
+  #topStrip{min-height:40px;padding:0}
+  #topStrip>span:not(.topActions){display:none}
+  .topActions{width:100%;justify-content:flex-end}
+  #mainRow{height:100%;min-height:0}
+  #blackPanel{display:flex;flex-direction:column;min-height:0}
+  #bpBody{flex:1 1 auto;align-items:center;min-height:0}
+  #knobs,#trackBtns{height:100%}
+  #midBand{height:auto;min-height:0}
+  .mbGroup{padding-left:6px;padding-right:6px}
+  .kitHead{flex-wrap:wrap;gap:4px}
+  .navArrows{grid-template-rows:repeat(2,minmax(28px,1fr));gap:4px}
+  .bankTop{gap:6px}
+  .bankBtnWrap{width:60px}
+  #bankLeds .brow{gap:10px}
+  #trigGrid{height:100%;min-height:64px;grid-template-rows:minmax(0,1fr)}
+  .trig{flex:1;height:auto;min-height:36px}
+  #foot{display:none}
+}
+@media (orientation:landscape) and (max-height:560px){
+  #scaleWrap{overflow:auto}
+  #unit{overflow-y:auto}
+  #trigGrid{min-height:42px}
+}
+
 </style>
 </head>
 <body>
@@ -1319,7 +1421,7 @@ button:focus-visible{outline:2px solid #ffb02e;outline-offset:2px}
       </div>
       <div id="bpBody">
         <div id="lcdCol">
-          <div id="lcdBezel"><div class="lcdPx"><canvas id="lcdCanvas" width="128" height="64"></canvas><i class="pxgrid"></i><span class="lcdFallback" aria-hidden="true"><b>MONOMACHINE</b><small id="lcdFallbackText">WEB OS V5.4.0 · LOADING…</small></span></div></div>
+          <div id="lcdBezel"><div class="lcdPx"><canvas id="lcdCanvas" width="128" height="64"></canvas><i class="pxgrid"></i><span class="lcdFallback" aria-hidden="true"><b>MONOMACHINE</b><small id="lcdFallbackText">WEB OS V5.5.1 · LOADING…</small></span></div></div>
           <div class="sfxLab"><span class="sfx">SFX60</span><span class="wlab small">+&nbsp; 6 TRACK MULTIPLE SYNTHESIS SEQUENCER</span></div>
         </div>
         <div id="knobsCol">
@@ -1514,8 +1616,8 @@ const MACHINES=[
  // id, group, display, sysex-ish id, SYN page slots (8), isFX
  {id:'GND',   g:'GND',   name:'GND-GND',   sx:0x00, syn:[null,null,null,null,null,null,null,null]},
  {id:'SIN',   g:'GND',   name:'GND-SIN',   sx:0x01, syn:[null,null,null,null,null,null,null,TUNE]},
- {id:'NOIS',  g:'GND',   name:'GND-NOIS',  sx:0x02, syn:[P('ST',64),P('RED',0),P('STON',127,'onoff'),null,null,null,null,TUNE]},
- {id:'SID',   g:'SID',   name:'SID-6581',  sx:0x03, syn:[P('PW',64,'bip'),P('PWAD',0),P('PWRS',127,'onoff'),P('WAVE',80,'enum',['TRI','SAW','PULS','MIX','NOIS']),P('MOD',0,'enum',['OFF','RING','SYNC']),P('MSRC',0,'enum',['MFRQ','PRCH']),P('MFRQ',64),TUNE]},
+ {id:'NOIS',  g:'GND',   name:'GND-NOIS',  sx:0x02, syn:[P('ST',0),P('RED',0),P('STON',0,'onoff'),null,null,null,null,TUNE]},
+ {id:'SID',   g:'SID',   name:'SID-6581',  sx:0x03, syn:[P('PW',0),P('PWAD',0),P('PWRS',96,'onoff'),P('WAVE',0,'enum',['TRI','SAW','PULS','MIX','NOIS']),P('MOD',0,'enum',['OFF','RING','SYNC']),P('MSRC',0,'enum',['MFRQ','PRCH']),P('MFRQ',64),TUNE]},
  {id:'SAW',   g:'SWAVE', name:'SWAVE-SAW', sx:0x04, syn:[P('UNIL',64),P('UNIW',18),P('UNIX',0),null,P('SUBX',0),P('SUB1',0),P('SUB2',0),TUNE]},
  {id:'PULS',  g:'SWAVE', name:'SWAVE-PULS',sx:0x05, syn:[P('UNIL',40),P('UNIW',14),P('SUB1',0),P('SUB2',0),P('PW',64,'bip'),P('PWAD',0),P('PWRS',127,'onoff'),TUNE]},
  {id:'ENS',   g:'SWAVE', name:'SWAVE-ENS', sx:0x0E, syn:[P('PCH2',64,'pch'),P('PCH3',64,'pch'),P('PCH4',64,'pch'),P('WAVE',40),P('PW',64),P('CHRL',70),P('CHRW',80),TUNE]},
@@ -1523,9 +1625,9 @@ const MACHINES=[
  {id:'BBOX',  g:'DPRO',  name:'DPRO-BBOX', sx:0x07, syn:[P('PTCH',64,'bip'),P('STRT',0),null,null,P('RTRG',0),P('RTIM',32),null,null]},
  {id:'DDRW',  g:'DPRO',  name:'DPRO-DDRW', sx:0x20, syn:[P('WAV1',0,'w64'),P('MIX',64,'bip'),P('WAV2',40,'w64'),P('TIME',20),P('BR1',0),P('WID',64,'bip'),P('BR2',0),TUNE]},
  {id:'DENS',  g:'DPRO',  name:'DPRO-DENS', sx:0x21, syn:[P('PCH2',64,'pch'),P('PCH3',64,'pch'),P('PCH4',64,'pch'),P('WAVE',8,'w64'),null,P('CHRL',70),P('CHRW',80),TUNE]},
- {id:'FMSTAT',g:'FM+',   name:'FM+STAT',   sx:0x08, syn:[P('1FRQ',32),P('1FIN',64,'bip'),P('1ENV',80),P('1FB',0),P('2FRQ',64),P('2VOL',40),P('TONE',100),TUNE]},
- {id:'FMPAR', g:'FM+',   name:'FM+PAR',    sx:0x09, syn:[P('1FRQ',32),P('1ENV',70),P('2FRQ',64),P('2ENV',50),P('3FRQ',96),P('3ENV',30),P('TONE',100),TUNE]},
- {id:'FMDYN', g:'FM+',   name:'FM+DYN',    sx:0x0A, syn:[P('1FRQ',40),P('1FEN',64,'bip'),P('1VOL',90),P('1VEN',70),P('2FRQ',80),P('2ENV',60),P('2FB',20),TUNE]},
+ {id:'FMSTAT',g:'FM+',   name:'FM+STAT',   sx:0x08, syn:[P('1FRQ',60),P('1FIN',64,'bip'),P('1ENV',80),P('1FB',30),P('2FRQ',80),P('2VOL',64),P('TONE',98),TUNE]},
+ {id:'FMPAR', g:'FM+',   name:'FM+PAR',    sx:0x09, syn:[P('1FRQ',60),P('1ENV',64),P('2FRQ',80),P('2ENV',64),P('3FRQ',102),P('3ENV',80),P('TONE',98),TUNE]},
+ {id:'FMDYN', g:'FM+',   name:'FM+DYN',    sx:0x0A, syn:[P('1FRQ',64),P('1FEN',64,'bip'),P('1VOL',64),P('1VEN',64),P('2FRQ',74),P('2ENV',80),P('2FB',30),TUNE]},
  {id:'VO6',   g:'VO',    name:'VO-6',      sx:0x0B, syn:[P('VOC1',90),P('VOC2',40),P('V-SW',127,'onoff'),P('VOIC',20),P('CONS',0,'cons'),P('CLEN',40),P('CVOL',90),TUNE]},
  {id:'THRU',  g:'FX',    name:'FX-THRU',   sx:0x0C, fx:true, syn:[null,null,null,null,null,null,null,P('INP',0,'enum',INP_LIST)]},
  {id:'REVERB',g:'FX',    name:'FX-REVERB', sx:0x0D, fx:true, syn:[P('DEC',80),P('DAMP',60),P('GATE',0),P('MIX',70),P('HP',20),P('LP',100),null,P('INP',0,'enum',INP_LIST)]},
@@ -1581,7 +1683,7 @@ function defaultParams(machineId){
   return o;
 }
 function mkTrack(machineId='SAW'){
-  return {machine:machineId, level:100, muted:false, out:'MAIN', params:defaultParams(machineId), steps:Array.from({length:64},mkStep)};
+  return {machine:machineId, level:100, muted:false, out:'MAIN', hpTrack:true, lpTrack:true, params:defaultParams(machineId), steps:Array.from({length:64},mkStep)};
 }
 function mkPattern(name='INIT'){
   return {name, bpm:120, swing:50, len:64, scale:1, kit:'INIT KIT',
@@ -1605,6 +1707,43 @@ function seq(tr,str,notes,opt={}){
 }
 const BBOX_DRUMS=['KICK','KICK2','SNARE','SNAR2','CLAP','RIM','HATC','HATO','CYMB','TOMH','TOMM','TOML','PERC1','PERC2','SHAKE','COWB','METAL','ZAP','BLIP','NOISE','SUB','CLICK','STICK','CRASH'];
 const DR=n=>36+BBOX_DRUMS.indexOf(n); // BBOX note->drum
+
+/* Original material studies, NOT SOPHIE's patches or samples. Named
+   parameters keep every recipe editable with the ordinary hardware pages. */
+const MATERIAL_PATCHES=[
+  {id:'rubber',name:'RUBBER SNAP',machine:'FMDYN',note:36,pitch:[6,96,3,64],pages:{
+    SYN:{'1FRQ':64,'1FEN':76,'1VOL':48,'1VEN':112,'2FRQ':91,'2ENV':116,'2FB':28},
+    AMP:{HOLD:0,DEC:65,REL:22,DIST:76,VOL:88},FILT:{WDTH:118,LPQ:16}}},
+  {id:'bubble',name:'BUBBLE POP',machine:'FMSTAT',note:48,pitch:[6,112,4,76],pages:{
+    SYN:{'1FRQ':85,'1FIN':69,'1ENV':116,'1FB':20,'2FRQ':102,'2VOL':18,TONE:118},
+    AMP:{HOLD:0,DEC:53,REL:18,DIST:67,VOL:86},FILT:{WDTH:124,LPQ:8}}},
+  {id:'metal',name:'CHROME GLASS',machine:'FMPAR',note:72,pages:{
+    SYN:{'1FRQ':85,'1ENV':112,'2FRQ':100,'2ENV':105,'3FRQ':116,'3ENV':96,TONE:124},
+    AMP:{HOLD:0,DEC:78,REL:48,DIST:64,VOL:74},FILT:{BASE:8,WDTH:115,LPQ:8},EFX:{DSND:24,DTIM:32,DFB:32}}},
+  {id:'plastic',name:'HARD PLASTIC',machine:'DDRW',note:53,pitch:[4,100,3,74],pages:{
+    SYN:{WAV1:0,MIX:48,WAV2:44,TIME:8,BR1:48,WID:76,BR2:64},
+    AMP:{HOLD:0,DEC:48,REL:20,DIST:70,VOL:80},FILT:{BASE:6,WDTH:96,LPQ:38,DEC:38,WOFS:84},EFX:{SRR:14}}},
+  {id:'air',name:'PRESSURE HISS',machine:'NOIS',note:60,pages:{
+    SYN:{ST:110,RED:26,STON:127},AMP:{HOLD:0,DEC:35,REL:16,DIST:64,VOL:62},
+    FILT:{BASE:66,WDTH:26,LPQ:64,DEC:35,BOFS:82,WOFS:88}}},
+  {id:'latex',name:'LATEX FORMANT',machine:'VO6',note:50,pitch:[4,72,2,54],pages:{
+    SYN:{VOC1:76,VOC2:48,'V-SW':127,VOIC:12,CONS:0,CLEN:12,CVOL:38},
+    AMP:{HOLD:0,DEC:78,REL:35,DIST:66,VOL:68},FILT:{WDTH:120,LPQ:10},
+    LFO2:{PAGE:8,DEST:8,TRIG:38,WAVE:31,MULT:40,SPD:54,DPTH:25}}}
+];
+function applyMaterialPatch(tr,id){
+  const patch=MATERIAL_PATCHES.find(p=>p.id===id); if(!patch) return null;
+  tr.machine=patch.machine; tr.params=defaultParams(patch.machine);
+  delete tr._hwExtra; delete tr._hwType;
+  for(const pg in patch.pages) for(const name in patch.pages[pg]) setP(tr,pg,name,patch.pages[pg][name]);
+  if(patch.pitch){
+    const [dest,depth,mult,speed]=patch.pitch;
+    const raw=(pg,i)=>Math.floor((i+0.5)*128/PAGE_DEFS.LFO1[pg].e.length);
+    // HALF + inverted saw: a positive strike pitch returning exactly to zero.
+    tr.params.LFO1=[raw(0,7),raw(1,dest),raw(2,4),raw(3,5),raw(4,mult),speed,0,depth];
+  }
+  return patch;
+}
 
 /* ---------- factory patterns (original compositions in the spirit of MONO2K bank A) ---------- */
 function factoryPatterns(){
@@ -1711,7 +1850,7 @@ function factoryPatterns(){
     seq(t3,'..x...x...x...x...x...x...x...x...x...x...x...x...x...x...x...x.',[DR('METAL'),DR('HATC')],{len:1});
     t4.machine='DDRW'; t4.params=defaultParams('DDRW'); setP(t4,'AMP','DEC',65);
     seq(t4,'......x...x.........x...x.........x...x.........x...x.......x...',['F3','G#3','C4','F3','D#3','C3'],{len:4,lockAll:i=>({'SYN.1':(i*31)%128,'SYN.4':(i*7)%50})});
-    t5.machine='SID'; t5.params=defaultParams('SID'); setP(t5,'SYN','MOD',90); setP(t5,'AMP','VOL',50); setP(t5,'EFX','SRR',24);
+    t5.machine='SID'; t5.params=defaultParams('SID'); setP(t5,'SYN','WAVE',80); setP(t5,'SYN','MOD',90); setP(t5,'AMP','VOL',50); setP(t5,'EFX','SRR',24);
     seq(t5,'x.x...x...x.x...x.x...x...x.x...x.x...x...x.x...x.x...x...x.x...',[60],{len:1,lockAll:i=>({'SYN.6':(i*13)%128})});
     t6.machine='FLANGER'; t6.params=defaultParams('FLANGER'); setP(t6,'AMP','DEC',127); setP(t6,'AMP','VOL',55);
     seq(t6,'x...............................................................',[60],{len:64});
@@ -1795,6 +1934,8 @@ function factoryPatterns(){
     seq(t5,'x...x.......x...x...x.......x...x...x.......x...x...x.......x...',['C3','Eb3','G3','C4','Bb3','G3'],{len:3,lockAll:i=>({'SYN.0':(i*9)%128,'SYN.1':(i*23)%128})});
     t6.machine='RINGMOD'; t6.params=defaultParams('RINGMOD'); setP(t6,'SYN','EXT',118); setP(t6,'SYN','MIX',104); setP(t6,'AMP','DEC',127); setP(t6,'AMP','HOLD',127); setP(t6,'AMP','VOL',92);
     seq(t6,'x...............x...............x...............x...............',['C3','G3','Eb4','Bb3'],{len:16});
+    applyMaterialPatch(t1,'rubber'); applyMaterialPatch(t3,'air');
+    t1.steps.forEach((st,i)=>{ if(st.on) st.locks={'SYN.1':[72,82,76,68][Math.floor(i/8)%4],'SYN.6':[18,36,24,42][Math.floor(i/8)%4],'LFO1.7':[76,100,88,112][Math.floor(i/8)%4]}; });
     p.kit='ELAST KIT'; add(8,p);
   }
   { // A10 PLASTIC — bit-reduced doubledraw plucks, glassy FM and glossy chorus
@@ -1814,6 +1955,8 @@ function factoryPatterns(){
     seq(t5,'x...............x...............x...............x...............',['F1','Db1','Ab1','Eb1'],{len:12});
     t6.machine='CHORUS'; t6.params=defaultParams('CHORUS'); setP(t6,'SYN','DEP',96); setP(t6,'SYN','SPD',72); setP(t6,'SYN','MIX',78); setP(t6,'SYN','WID',122); setP(t6,'AMP','DEC',127); setP(t6,'AMP','HOLD',127); setP(t6,'AMP','VOL',84);
     seq(t6,'x...............................................................',[60],{len:64});
+    applyMaterialPatch(t1,'plastic'); applyMaterialPatch(t2,'metal');
+    t1.steps.forEach((st,i)=>{ if(st.on) st.locks={'SYN.1':[40,58,76,48][i%4],'SYN.4':[36,52,68,44][i%4],'LFO1.7':70+(i%4)*12}; });
     p.kit='PLAST KIT'; add(9,p);
   }
   { // A11 Latex — rubbery VO-6 formants, tuned stereo noise and soft FM
@@ -1834,6 +1977,8 @@ function factoryPatterns(){
     seq(t5,'..x...x...x...x...x...x...x...x...x...x...x...x...x...x...x...x.',[DR('SHAKE'),DR('HATC')],{len:1});
     t6.machine='REVERB'; t6.params=defaultParams('REVERB'); setP(t6,'SYN','DEC',92); setP(t6,'SYN','MIX',58); setP(t6,'AMP','DEC',127); setP(t6,'AMP','HOLD',127); setP(t6,'AMP','VOL',78);
     seq(t6,'x...............................................................',[60],{len:64});
+    applyMaterialPatch(t1,'latex'); applyMaterialPatch(t2,'bubble');
+    t2.steps.forEach((st,i)=>{ if(st.on) st.locks={'SYN.2':[108,116,120,112][i%4],'LFO1.7':[68,98,112,82][i%4]}; });
     p.kit='Latex KIT'; add(10,p);
   }
   { // A12 GLASSLAB — fast glass FM, scanned waves and flanged metal
@@ -1854,6 +1999,8 @@ function factoryPatterns(){
     seq(t5,'x.......x.......x.......x.......x.......x.......x.......x.......',['E1','E1','G1','B1','E1','D1','C1','B0'],{len:5,lockAll:i=>({'SYN.1':(i%2?0:127),'SYN.6':30+((i*19)%84)})});
     t6.machine='FLANGER'; t6.params=defaultParams('FLANGER'); setP(t6,'SYN','DEP',112); setP(t6,'SYN','SPD',86); setP(t6,'SYN','MIX',96); setP(t6,'SYN','FB',104); setP(t6,'SYN','WID',124); setP(t6,'AMP','DEC',127); setP(t6,'AMP','HOLD',127); setP(t6,'AMP','VOL',86);
     seq(t6,'x...............................................................',[60],{len:64});
+    applyMaterialPatch(t1,'metal'); applyMaterialPatch(t5,'rubber');
+    t5.steps.forEach((st,i)=>{ if(st.on) st.locks={'SYN.1':[74,82,70,78][Math.floor(i/8)%4],'SYN.6':24+(i%3)*10,'LFO1.7':80+(i%3)*14}; });
     p.kit='GLASS KIT'; add(11,p);
   }
   return P128;
@@ -1864,7 +2011,7 @@ function factoryKits(){
   return kits;
 }
 function kitOfTrack(tr){
-  const o={machine:tr.machine, level:tr.level, out:tr.out, params:JSON.parse(JSON.stringify(tr.params))};
+  const o={machine:tr.machine, level:tr.level, out:tr.out, hpTrack:tr.hpTrack!==false, lpTrack:tr.lpTrack!==false, params:JSON.parse(JSON.stringify(tr.params))};
   if(Array.isArray(tr._hwExtra)) o._hwExtra=tr._hwExtra.slice(0,16);
   if(typeof tr._hwType==='number') o._hwType=tr._hwType;
   return o;
@@ -1883,7 +2030,7 @@ const S={
   octave:4, gridRec:true, liveRec:false, playing:false, playStep:-1,
   lockStep:-1,            // step being p-lock edited (latched), -1 none
   selStep:0,
-  masterVol:0.85, poly:false, midiOut:false, followPage:true, lang:'ru',
+  masterVol:0.85, poly:false, midiOut:false, followPage:true, lang:'ru', perfMode:'auto',
   song:[], songMode:false, songPos:0, songCount:0,
   userWaves:new Array(64).fill(null), // {data:Float32Array(256), name} for DDRW/DENS slots 33-64 etc
   userSamples:{},         // BBOX idx -> AudioBuffer (not persisted raw; persisted as wav dataURL small)
@@ -1911,8 +2058,8 @@ function saveNow(){
       const blank=p.name==='INIT'&&p.tracks.every(t=>t.steps.every(s=>!s.on)); if(blank) continue; // don't waste quota on untouched slots
       pats[k]=p; }
     const waves=S.userWaves.map(w=>w?{name:w.name,data:Array.from(w.data)}:null);
-    localStorage.setItem(LS_KEY, JSON.stringify({patterns:pats,kits:S.kits,userWaves:waves,curPat:S.curPat,masterVol:S.masterVol,song:S.song,lang:S.lang}));
-    try{ localStorage.setItem('monomachine_lang',S.lang==='en'?'en':'ru'); }catch(e2){}
+    localStorage.setItem(LS_KEY, JSON.stringify({patterns:pats,kits:S.kits,userWaves:waves,curPat:S.curPat,masterVol:S.masterVol,song:S.song,lang:S.lang,perfMode:S.perfMode}));
+    try{ localStorage.setItem('monomachine_lang',S.lang==='en'?'en':'ru'); localStorage.setItem('monomachine_perf',['auto','lite','full'].includes(S.perfMode)?S.perfMode:'auto'); }catch(e2){}
   }catch(e){/* quota */}
 }
 function _finiteNum(v,fallback){ const n=+v; return isFinite(n)?n:fallback; }
@@ -1957,6 +2104,8 @@ function reviveTrack(src,withSteps=true){
   tr.level=R127(_finiteNum(inp.level,100));
   tr.muted=!!inp.muted;
   tr.out=inp.out==='NEIB'?'NEIB':'MAIN';
+  tr.hpTrack=inp.hpTrack!==false;
+  tr.lpTrack=inp.lpTrack!==false;
   tr.params=sanitizeParams(machine,inp.params);
   if(withSteps){
     const steps=Array.isArray(inp.steps)?inp.steps:[];
@@ -1993,7 +2142,7 @@ function revivePattern(src){ // tolerate older/partial/corrupt data without taki
   return base;
 }
 function loadSaved(){
-  try{ const savedLang=localStorage.getItem('monomachine_lang'); if(savedLang==='en'||savedLang==='ru') S.lang=savedLang; else if(typeof navigator!=='undefined'&&navigator.language&&/^en\b/i.test(navigator.language)) S.lang='en'; }catch(e){}
+  try{ const savedLang=localStorage.getItem('monomachine_lang'); if(savedLang==='en'||savedLang==='ru') S.lang=savedLang; else if(typeof navigator!=='undefined'&&navigator.language&&/^en\b/i.test(navigator.language)) S.lang='en'; const savedPerf=localStorage.getItem('monomachine_perf'); if(['auto','lite','full'].includes(savedPerf)) S.perfMode=savedPerf; }catch(e){}
   S._factory=factoryPatterns();
   S.kits=factoryKits();
   S.patterns={};
@@ -2021,7 +2170,8 @@ function loadSaved(){
     if(typeof d.curPat==='number') S.curPat=clamp(Math.round(_finiteNum(d.curPat,0)),0,127);
     if(typeof d.masterVol==='number') S.masterVol=clamp(_finiteNum(d.masterVol,0.85),0,1);
     if(d.lang==='en'||d.lang==='ru') S.lang=d.lang;
-    try{ const savedLang=localStorage.getItem('monomachine_lang'); if(savedLang==='en'||savedLang==='ru') S.lang=savedLang; }catch(e2){}
+    if(['auto','lite','full'].includes(d.perfMode)) S.perfMode=d.perfMode;
+    try{ const savedLang=localStorage.getItem('monomachine_lang'); if(savedLang==='en'||savedLang==='ru') S.lang=savedLang; const savedPerf=localStorage.getItem('monomachine_perf'); if(['auto','lite','full'].includes(savedPerf)) S.perfMode=savedPerf; }catch(e2){}
     if(Array.isArray(d.song)) S.song=d.song.slice(0,256).map(r=>({pat:clamp(Math.round(_finiteNum(r&&r.pat,0)),0,127),rep:clamp(Math.round(_finiteNum(r&&r.rep,1)),1,64)}));
   }catch(e){
     // Corrupt storage is recoverable: factory content is already installed above.
@@ -2310,6 +2460,8 @@ function sxKitToAppKit(dec){
     if(MACH[machine].fx) params.SYN[7]=sxFxInputRaw(dec,t);
     return {
       machine,level:clamp(kt.level||0,0,127),out:(kt.type&1)?'MAIN':'NEIB',params,
+      hpTrack:!dec.hw||dec.hw.hpKeyTrack==null?true:!!((dec.hw.hpKeyTrack>>t)&1),
+      lpTrack:!dec.hw||dec.hw.lpKeyTrack==null?true:!!((dec.hw.lpKeyTrack>>t)&1),
       _hwExtra:kt.params72.slice(56,72),_hwType:kt.type
     };
   });
@@ -2356,7 +2508,12 @@ function sxAppKitDecodedBytes(kit){
   tracks.forEach((t,i)=>{ if(MACH[t.machine].fx&&(t.type&0x08)) patchBusIn=(patchBusIn&~(3<<(2*i)))|(1<<(2*i)); });
   push((patchBusIn>>8)&0xFF,patchBusIn&0xFF,hw.mirrorLR||0,hw.mirrorUD||0);
   pushArr(hw.destPages,72); pushArr(hw.destParams,72); pushArr(hw.destRanges,72);
-  push(hw.lpKeyTrack==null?0x3F:hw.lpKeyTrack,hw.hpKeyTrack==null?0x3F:hw.hpKeyTrack,hw.trigPortamento||0);
+  let lpKeyTrack=hw.lpKeyTrack==null?0x3F:hw.lpKeyTrack, hpKeyTrack=hw.hpKeyTrack==null?0x3F:hw.hpKeyTrack;
+  tracks.forEach((t,i)=>{
+    if(t.src.lpTrack===false) lpKeyTrack&=~(1<<i); else if(t.src.lpTrack===true) lpKeyTrack|=(1<<i);
+    if(t.src.hpTrack===false) hpKeyTrack&=~(1<<i); else if(t.src.hpTrack===true) hpKeyTrack|=(1<<i);
+  });
+  push(lpKeyTrack&0xFF,hpKeyTrack&0xFF,hw.trigPortamento||0);
   pushArr(hw.trigTracks,6,255);
   push(hw.trigLegatoAmp||0,hw.trigLegatoFilter||0,hw.trigLegatoLFO||0,
        hw.commonMultimode||0,hw.commonTiming||0,hw.splitKey||0,hw.splitRange||0);
@@ -2578,16 +2735,37 @@ function sxParseFile(bytes,filename='file.syx',opts={}){
    Clean-room Web Audio recreation. Envelope laws & SWAVE behaviour follow
    MONO2K's published calibration notes measured against OS 1.32B. */
 'use strict';
-const AE={ctx:null,started:false,tracks:[],uiQueue:[],lfoOff:[],midiOutPort:null,workletOK:false,_stopMuted:false,_stopSerial:0};
+const AE={ctx:null,started:false,tracks:[],uiQueue:[],lfoOff:[],midiOutPort:null,workletOK:false,wasmSRR:false,perfLite:false,_lfoTimer:null,_stopMuted:false,_stopSerial:0};
+/*__MM_SRR_WASM_B64_START__*/
+const MM_SRR_WASM_B64=
+  'AGFzbQEAAAABCQFgBX9/fX1/AAMCAQAFAwEAAQcUAgZtZW1vcnkCAAdwcm9jZXNzAAAKmgIBlwIDAn8FfQF/IAQqAgAhCSAE'+
+  'QQRqKgIAIQogBEEIaioCACELIARBDGooAgAhDEEAIQUCQANAIAUgAU4NASAAIAVBBGxqIQYgBioCACEHIAJDxSCAP18EQCAH'+
+  'IQggByEJIAchCkMAAIA/IQtBASEMBSAMRQRAIAchCSAHIQpDAAAAACELQQEhDAsgCyACYARAIAohCSAHIQpDAAAAACELCyAJ'+
+  'IAogCZMgCyAClZSSIQggC0MAAIA/kiELCyADQwAAAABeBEAgCCADlZAgA5QhCAtDAACAv0MAAIA/IAiWlyEIIAYgCDgCACAF'+
+  'QQFqIQUMAAsLIAQgCTgCACAEQQRqIAo4AgAgBEEIaiALOAIAIARBDGogDDYCAAs=';
+/*__MM_SRR_WASM_B64_END__*/
 const $AE=()=>AE.ctx;
 const nowT=()=>AE.ctx?AE.ctx.currentTime:0;
+function perfLiteEnabled(){
+  try{ const b=window.__monoBoot; if(b&&typeof b.perfLite==='boolean') return b.perfLite; }catch(e){}
+  try{ return !!document.documentElement.classList.contains('perf-lite'); }catch(e){ return false; }
+}
+function setLfoTimer(){
+  if(AE._lfoTimer) clearInterval(AE._lfoTimer);
+  AE._lfoTimer=setInterval(lfoTick,AE.perfLite?25:12);
+}
+AE.setPerfLite=function(on){
+  AE.perfLite=!!on;
+  if(AE.analyser) AE.analyser.fftSize=AE.perfLite?256:512;
+  if(AE.started) setLfoTimer();
+};
 function seededRand(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 
 /* ---------- waves ---------- */
 function makeWaves32(ctx){
   const waves=[];
   for(let i=0;i<32;i++){
-    const R=seededRand(1000+i*77), NH=64, re=new Float32Array(NH+1), im=new Float32Array(NH+1);
+    const R=seededRand(1000+i*77), NH=AE.perfLite?32:64, re=new Float32Array(NH+1), im=new Float32Array(NH+1);
     const kind=i%8;
     for(let k=1;k<=NH;k++){
       let a=0;
@@ -2610,7 +2788,7 @@ function makeWaves32(ctx){
 }
 function makeClassicWaves(ctx){ // slots 33..64 stand-ins (like MONO2K/Monomodule stand-in bank)
   const defs=[];
-  const H=(fn)=>{const NH=64,re=new Float32Array(NH+1),im=new Float32Array(NH+1);for(let k=1;k<=NH;k++){re[k]=0;im[k]=fn(k);}return ctx.createPeriodicWave(re,im,{normalize:true});};
+  const H=(fn)=>{const NH=AE.perfLite?32:64,re=new Float32Array(NH+1),im=new Float32Array(NH+1);for(let k=1;k<=NH;k++){re[k]=0;im[k]=fn(k);}return ctx.createPeriodicWave(re,im,{normalize:true});};
   defs.push(H(k=>k===1?1:0)); defs.push(H(k=>k%2?1/(k*k)*( (k%4===1)?1:-1):0));
   defs.push(H(k=>1/k)); defs.push(H(k=>k%2?1/k:0)); defs.push(H(k=>k%2?1/k:0.3/k));
   defs.push(H(k=>k<=5?1:0)); defs.push(H(k=>(k===1||k===2||k===3||k===4)?1/Math.sqrt(k):0));
@@ -2620,7 +2798,7 @@ function makeClassicWaves(ctx){ // slots 33..64 stand-ins (like MONO2K/Monomodul
   return defs;
 }
 function waveFromSamples(ctx,samples){
-  const N=samples.length, NH=96, re=new Float32Array(NH+1), im=new Float32Array(NH+1);
+  const N=samples.length, NH=AE.perfLite?48:96, re=new Float32Array(NH+1), im=new Float32Array(NH+1);
   for(let k=1;k<=NH;k++){ let r=0,i2=0; for(let n=0;n<N;n++){ const ph=2*Math.PI*k*n/N; r+=samples[n]*Math.cos(ph); i2-=samples[n]*Math.sin(ph);} re[k]=2*r/N; im[k]=2*i2/N; }
   return ctx.createPeriodicWave(re,im,{normalize:true});
 }
@@ -2656,19 +2834,78 @@ function setParamFast(param,t,v,tau=0.012){
 /* variable-width pulse: saw + DC offset -> step waveshaper (true PWM via offset.gain) */
 function pulseOsc(f,pw01){
   const ctx=AE.ctx, saw=mkOsc('sawtooth',f), sum=mkGain(1), off=ctx.createConstantSource(), offG=mkGain(1), sh=ctx.createWaveShaper();
-  sh.curve=stepCurve(); off.offset.value=clamp(1-2*pw01,-0.98,0.98);
+  sh.curve=stepCurve(); off.offset.value=clamp(1-2*pw01,-1,1);
   saw.connect(sum); off.connect(offG); offG.connect(sum); sum.connect(sh);
   const out=mkGain(1); sh.connect(out);
   return {osc:saw, out, pwParam:off.offset, start(t){saw.start(t);off.start(t);}, stop(t){try{saw.stop(t);}catch(e){} try{off.stop(t);}catch(e){}}};
 }
-const pwToOffset=pw01=>clamp(1-2*clamp(pw01,0.02,0.98),-0.98,0.98);
+const pwToOffset=pw01=>clamp(1-2*clamp(pw01,0,1),-1,1);
+// Hardware pulse-width laws are not the same on the two machines:
+// SID is folded around its centre (square at both ends, silence in the
+// middle), SWAVE-PULS is a straight 0..1 duty cycle.
+const sidDuty=raw=>Math.abs(clamp(raw,0,127)-64)/128;
+const pulsDuty=raw=>clamp(raw,0,127)/128;
 const FREQ=v=>clamp(20*Math.pow(1000,clamp(v,0,140)/127),18,19000);
-const QMAP=v=>0.5+Math.pow(v/127,2)*16;
+/* The Monomachine's BASE/WDTH filter is note-relative: BASE 0 puts the
+   high-pass two octaves below the note and every 8 steps move an octave.
+   With key tracking off, the same index is read from MIDI note 0 instead. */
+const FILT_FIXED_REF=8.175798915643707; // mtof(0)
+function filtFreq(step,ta,tr,kind){
+  const tracked=kind==='hp' ? (!tr||tr.hpTrack!==false) : (!tr||tr.lpTrack!==false);
+  const ref=tracked?clamp((ta&&ta.curFreq)||440,8,20000):FILT_FIXED_REF;
+  const maxF=AE.ctx?Math.min(19000,AE.ctx.sampleRate*0.45):19000;
+  return clamp(ref*Math.pow(2,(step-16)/8),10,maxF);
+}
+function filtPoleFreqs(ta,tr,base,width,lpqRaw){
+  const maxF=AE.ctx?Math.min(19000,AE.ctx.sampleRate*0.45):19000;
+  const hp=filtFreq(base,ta,tr,'hp'), lp=filtFreq(base+width,ta,tr,'lp');
+  const lpShift=1+0.35*(1-clamp(lpqRaw||0,0,127)/127);
+  return {hp,hpTail:clamp(hp*1.75,10,maxF),lp:clamp(lp*lpShift,10,maxF),lpTail:clamp(lp*1.55,10,maxF)};
+}
+function setFilterTargets(ta,tr,base,width,t,tau,lpqRaw){
+  if(!ta) return;
+  const p=filtPoleFreqs(ta,tr,base,width,lpqRaw);
+  ta.hp.frequency.setTargetAtTime(p.hp,t,tau);
+  if(ta.hp2) ta.hp2.frequency.setTargetAtTime(p.hpTail,t,tau);
+  ta.lp1.frequency.setTargetAtTime(p.lp,t,tau);
+  ta.lp2.frequency.setTargetAtTime(p.lpTail,t,tau);
+}
+const QMAP=v=>0.55+Math.pow(clamp(v,0,127)/127,2.2)*44;
 const atkSec=v=>Math.min(10,0.0009*Math.exp(0.0814*v));           // MONO2K calibration
 const decTau=v=>Math.min(8,(0.0083*Math.exp(0.0665*v))/1.2);      // 20 dB in 8.3ms*e^(0.0665v)
-const holdSec=v=>v*0.0146;                                          // 14.6 ms per step
-const FM_RATIOS=[0.25,0.5,0.75,1,1.001,1.5,2,2.5,3,3.5,4,5,6,7,8,9,10,11,12,14,16,18,20,24,28,32,40,48];
+function holdSec(v){ let bpm=120; try{ bpm=curPat().bpm||120; }catch(e){} return v/32*(60/bpm); } // HOLD 32 = one beat
+const FM_RATIOS=[1/64,1/32,1/16,3/32,1/8,5/32,3/16,1/4,5/16,3/8,7/16,1/2,5/8,3/4,7/8,1,1.25,1.5,1.75,2,2.5,3,3.5,4];
 const fmRatio=raw=>FM_RATIOS[clamp(Math.floor(raw/128*FM_RATIOS.length),0,FM_RATIOS.length-1)];
+function fmIndexPeak(raw){
+  raw=clamp(raw,0,127);
+  return raw<=64 ? 1.57*raw/64 : 1.57+(14-1.57)*(raw-64)/63;
+}
+function fmEnvSeconds(raw){
+  // 1ENV above 64: about 24 s at raw 72 falling geometrically to 6 ms at 127.
+  return clamp(24*Math.exp(-(clamp(raw,0,127)-72)*Math.log(4000)/55),0.006,30);
+}
+function scheduleFmEnv(gainParam,raw,modHz,t,scale=1,mode='stat'){
+  const hz=Math.max(0.01,modHz);
+  let peak, rest;
+  if(raw<=64){ peak=fmIndexPeak(raw); rest=peak; }
+  else if(mode==='par'){ peak=fmIndexPeak(raw); rest=0; }
+  else { peak=fmIndexPeak(64); rest=0; }
+  gainParam.cancelScheduledValues(t);
+  gainParam.setValueAtTime(peak*scale*hz,t);
+  if(raw>64) gainParam.setTargetAtTime(rest*scale*hz,t,Math.max(0.004,fmEnvSeconds(raw)/3));
+}
+const fmToneHz=raw=>clamp(30*Math.pow(1.61,clamp(raw,0,127)/8),25,19000);
+function fmDynSeconds(raw){ return clamp(6*Math.exp(-(clamp(raw,0,127)-72)*Math.log(1500)/55),0.004,8); }
+function fmDynDepth(volRaw,venRaw){
+  const base=fmIndexPeak(volRaw);
+  if(venRaw<64){ const scaled=base*(1-(64-venRaw)/32); return {peak:scaled,rest:scaled,sec:fmDynSeconds(venRaw)}; }
+  if(venRaw>64){
+    const pushed=Math.min(128,volRaw+4*(venRaw-64));
+    const peak=pushed<=127?fmIndexPeak(pushed):14+(14-1.57)/63;
+    return {peak,rest:base,sec:fmDynSeconds(venRaw)};
+  }
+  return {peak:base,rest:base,sec:fmDynSeconds(venRaw)};
+}
 
 /* effective params = kit params + step locks + LFO snapshot offsets */
 function effParams(tr,locks,ti){
@@ -2727,12 +2964,14 @@ async function initAudio(){
 async function initAudioOnce(){
   const AC=window.AudioContext||window.webkitAudioContext;
   if(!AC) throw new Error('Web Audio is not available in this browser');
+  AE.perfLite=perfLiteEnabled();
   let ctx;
-  try{ ctx=new AC({latencyHint:'interactive'}); }catch(e){ ctx=new AC(); }
-  AE.ctx=ctx;
+  try{ ctx=new AC({sampleRate:44100,latencyHint:'interactive'}); }
+  catch(e1){ try{ ctx=new AC({latencyHint:'interactive'}); }catch(e2){ ctx=new AC(); } }
+  AE.ctx=ctx; AE.sampleRate=ctx.sampleRate;
   AE.busSum=mkGain(1); AE.master=mkGain(S.masterVol);
   AE.comp=ctx.createDynamicsCompressor(); AE.comp.threshold.value=-14; AE.comp.ratio.value=4; AE.comp.knee.value=18;
-  AE.analyser=ctx.createAnalyser(); AE.analyser.fftSize=512;
+  AE.analyser=ctx.createAnalyser(); AE.analyser.fftSize=AE.perfLite?256:512;
   AE.busSum.connect(AE.master); AE.master.connect(AE.comp); AE.comp.connect(AE.analyser); AE.analyser.connect(ctx.destination);
   try{ AE.streamDest=ctx.createMediaStreamDestination?ctx.createMediaStreamDestination():null; if(AE.streamDest) AE.master.connect(AE.streamDest); }
   catch(e){ AE.streamDest=null; } // PCM WAV recording has its own ScriptProcessor path; this must never block audio on old Safari.
@@ -2744,9 +2983,60 @@ async function initAudioOnce(){
   for(let i=0;i<dR.length;i++) dR[i]=Math.random()*2-1;
   AE.noiseBufR=nbR;
   AE.waves32=makeWaves32(ctx); AE.wavesClassic=makeClassicWaves(ctx);
-  // SRR worklet (sample & hold). Fallback: quantizer shaper.
+  // SRR worklet: WASM linear-interpolation decimation (the hardware joins
+  // reduced samples with straight lines), with the identical algorithm in
+  // plain JS as the fallback for browsers without worklet WebAssembly.
   try{
-    const code=`class C extends AudioWorkletProcessor{static get parameterDescriptors(){return[{name:'factor',defaultValue:1,minValue:1,maxValue:96},{name:'bits',defaultValue:16,minValue:2,maxValue:16}]}constructor(){super();this.h=new Float32Array(2);this.n=new Float32Array(2)}process(i,o,p){const inp=i[0],out=o[0];if(!inp||!inp.length)return true;const f=p.factor[0]||1,bits=p.bits[0]||16;if(f<=1.001&&bits>=15.5){for(let ch=0;ch<out.length;ch++)out[ch].set(inp[ch]||inp[0]);return true}const steps=Math.pow(2,bits-1),inv=1/steps;for(let ch=0;ch<out.length;ch++){const ic=inp[ch]||inp[0],oc=out[ch];let h=this.h[ch],n=this.n[ch];for(let j=0;j<oc.length;j++){n-=1;if(n<=0){n=f;h=Math.round(ic[j]*steps)*inv}oc[j]=h}this.h[ch]=h;this.n[ch]=n}return true}}registerProcessor('mm-crush',C)`;
+    const code=`const WASM_B64=${JSON.stringify(MM_SRR_WASM_B64)};
+const B64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function b64ToBytes(str){var clean='';for(var i=0;i<str.length;i++){var c=str.charAt(i);if(c!=='='&&B64.indexOf(c)>=0)clean+=c;}var out=new Uint8Array(Math.floor(clean.length*3/4));var o=0,acc=0,bits=0;for(var j=0;j<clean.length;j++){acc=(acc<<6)|B64.indexOf(clean.charAt(j));bits+=6;if(bits>=8){bits-=8;out[o++]=(acc>>bits)&255;}}return out.subarray(0,o);}
+var wasm=null,wasmReady=false,wasmWaiters=[],nextSlot=0;
+function onWasmReady(fn){if(wasmReady){try{fn();}catch(e){}}else wasmWaiters.push(fn);}
+try{
+  if(WASM_B64&&typeof WebAssembly!=='undefined'&&WebAssembly.instantiate){
+    WebAssembly.instantiate(b64ToBytes(WASM_B64),{}).then(function(r){var ex=r&&r.instance&&r.instance.exports;if(ex&&ex.memory&&ex.process){wasm={memory:ex.memory,mem:new Float32Array(ex.memory.buffer),process:ex.process};wasmReady=true;var ws=wasmWaiters;wasmWaiters=[];ws.forEach(function(fn){try{fn();}catch(e){}});}}).catch(function(){wasmReady=false;});
+  }
+}catch(e){wasmReady=false;}
+class C extends AudioWorkletProcessor{
+  static get parameterDescriptors(){return[{name:'factor',defaultValue:1,minValue:1,maxValue:16},{name:'bits',defaultValue:16,minValue:2,maxValue:16}];}
+  constructor(){super();this.slot=nextSlot++;this.base=this.slot*8192;this.a=new Float32Array(2);this.b=new Float32Array(2);this.age=new Float32Array(2);this.primed=new Uint8Array(2);this._active=false;var self=this;onWasmReady(function(){try{self.port.postMessage({type:'wasm-ready'});}catch(e){}});}
+  resetState(){this.primed[0]=0;this.primed[1]=0;if(wasmReady&&wasm&&this.slot<8){try{if(wasm.mem.buffer!==wasm.memory.buffer)wasm.mem=new Float32Array(wasm.memory.buffer);var si=(this.base+4096)/4;for(var i=0;i<8;i++)wasm.mem[si+i]=0;}catch(e){}}}
+  process(i,o,p){
+    var inp=i[0],out=o[0];if(!inp||!inp.length||!out||!out.length)return true;
+    var f=p.factor[0]||1,bits=p.bits[0]||16;
+    if(f<=1.001&&bits>=15.5){for(var c0=0;c0<out.length;c0++)out[c0].set(inp[c0]||inp[0]);this._active=false;return true;}
+    if(!this._active){this.resetState();this._active=true;}
+    var qstep=bits>=15.5?0:(2/Math.pow(2,bits));
+    var frames=out[0].length;
+    if(wasmReady&&wasm&&this.slot<8){
+      try{
+        if(wasm.mem.buffer!==wasm.memory.buffer)wasm.mem=new Float32Array(wasm.memory.buffer);
+        for(var ch=0;ch<out.length;ch++){
+          var ptr=this.base+ch*2048,state=this.base+4096+ch*16,ic=inp[ch]||inp[0],oc=out[ch];
+          wasm.mem.set(ic,ptr/4);wasm.process(ptr,frames,f,qstep,state);oc.set(wasm.mem.subarray(ptr/4,ptr/4+frames));
+        }
+        return true;
+      }catch(e){wasmReady=false;}
+    }
+    for(var ch2=0;ch2<out.length;ch2++){
+      var ic2=inp[ch2]||inp[0],oc2=out[ch2],a=this.a[ch2],b=this.b[ch2],age=this.age[ch2],primed=this.primed[ch2];
+      for(var j=0;j<frames;j++){
+        var x=ic2[j],y;
+        if(f<=1.001){y=x;a=x;b=x;age=1;primed=1;}
+        else{
+          if(!primed){a=x;b=x;age=0;primed=1;}
+          if(age>=f){a=b;b=x;age=0;}
+          y=a+(b-a)*(age/f);age+=1;
+        }
+        if(qstep>0)y=Math.round(y/qstep)*qstep;
+        oc2[j]=y<-1?-1:(y>1?1:y);
+      }
+      this.a[ch2]=a;this.b[ch2]=b;this.age[ch2]=age;this.primed[ch2]=primed;
+    }
+    return true;
+  }
+}
+registerProcessor('mm-crush',C)`;
     const url=URL.createObjectURL(new Blob([code],{type:'application/javascript'}));
     let workletTimer=null;
     await Promise.race([
@@ -2754,6 +3044,7 @@ async function initAudioOnce(){
       new Promise((resolve,reject)=>{ workletTimer=setTimeout(()=>reject(new Error('AudioWorklet load timeout')),1500); })
     ]);
     if(workletTimer) clearTimeout(workletTimer);
+    try{ URL.revokeObjectURL(url); }catch(e){}
     AE.workletOK=true;
   }catch(e){ AE.workletOK=false; }
   AE.tracks=[];
@@ -2769,7 +3060,7 @@ async function initAudioOnce(){
   AE.started=true;
   AE._initPromise=null;
   for(let i=0;i<6;i++){ applyChain(i, effParams(curPat().tracks[i],null,i), nowT()); }
-  setInterval(lfoTick,40);
+  setLfoTimer();
   ctx.addEventListener && ctx.addEventListener('statechange',()=>{ if(ctx.state==='interrupted') safeAudioResume(); });
 }
 AE.init=initAudio;
@@ -2780,9 +3071,11 @@ function buildTrackChain(idx){
   ta.in=mkGain(1);
   ta.distPre=mkGain(1); ta.dist=ctx.createWaveShaper(); ta.dist.curve=distCurveFor(1); ta.distPost=mkGain(1);
   ta.crushQ=ctx.createWaveShaper(); setQuant(ta.crushQ,16);
-  if(AE.workletOK){ ta.crush=new AudioWorkletNode(ctx,'mm-crush',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2]}); }
+  if(AE.workletOK){ ta.crush=new AudioWorkletNode(ctx,'mm-crush',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2]});
+    try{ ta.crush.port.onmessage=e=>{ if(e&&e.data&&e.data.type==='wasm-ready') AE.wasmSRR=true; }; }catch(e){} }
   else ta.crush=mkGain(1);
-  ta.hp=mkFilter('highpass',20,0.7); ta.lp1=mkFilter('lowpass',19000,0.7); ta.lp2=mkFilter('lowpass',19000,0.7);
+  ta.hp=mkFilter('highpass',20,0.7); ta.hp2=mkFilter('highpass',20,0.5); ta.lp1=mkFilter('lowpass',19000,0.7); ta.lp2=mkFilter('lowpass',19000,0.7);
+  ta.srrLp=mkFilter('lowpass',19000,0.4);
   ta.eq=mkFilter('peaking',1200,0.9); ta.eq.gain.value=0;
   ta.ampEnv=mkGain(0); ta.lfoVol=mkGain(1); ta.postAmp=mkGain(1);
   ta.pan=ctx.createStereoPanner?ctx.createStereoPanner():mkGain(1);
@@ -2791,7 +3084,7 @@ function buildTrackChain(idx){
   // With the worklet present, do not also run a 16-bit WaveShaper on every sample.
   if(AE.workletOK) ta.distPost.connect(ta.crush);
   else { ta.distPost.connect(ta.crushQ); ta.crushQ.connect(ta.crush); }
-  ta.crush.connect(ta.hp); ta.hp.connect(ta.lp1); ta.lp1.connect(ta.lp2); ta.lp2.connect(ta.eq);
+  ta.crush.connect(ta.srrLp); ta.srrLp.connect(ta.hp); ta.hp.connect(ta.hp2); ta.hp2.connect(ta.lp1); ta.lp1.connect(ta.lp2); ta.lp2.connect(ta.eq);
   ta.eq.connect(ta.ampEnv); ta.ampEnv.connect(ta.lfoVol); ta.lfoVol.connect(ta.postAmp); ta.postAmp.connect(ta.pan);
   if(ta.pan.connect) ta.pan.connect(ta.level);
   ta.level.connect(ta.outGain); ta.outGain.connect(AE.busSum);
@@ -2874,11 +3167,11 @@ function rebuildFX(ta,machineId){
 }
 let _irTimer={};
 function regenIR(ta,dec,damp,gate){
-  const key=dec+'/'+damp+'/'+gate; if(ta.fxNodes&&ta.fxNodes.irKey===key) return;
+  const key=dec+'/'+damp+'/'+gate+(AE.perfLite?'/L':'/F'); if(ta.fxNodes&&ta.fxNodes.irKey===key) return;
   clearTimeout(_irTimer[ta.idx]);
   _irTimer[ta.idx]=setTimeout(()=>{
     const ctx=AE.ctx; if(!ta.fxNodes||!ta.fxNodes.conv) return;
-    const dur=0.25+Math.pow(dec/127,1.4)*5.5, sr=ctx.sampleRate, len=Math.floor(sr*dur);
+    const dur=0.25+Math.pow(dec/127,1.4)*(AE.perfLite?2.2:5.5), sr=ctx.sampleRate, len=Math.floor(sr*dur);
     const buf=ctx.createBuffer(2,len,sr);
     const gateLen=gate>2? Math.floor(len*(1-gate/160)) : len;
     for(let ch=0;ch<2;ch++){ const dd=buf.getChannelData(ch); let lp=0; const coeff=1-Math.pow(damp/127,1.5)*0.92;
@@ -2934,6 +3227,7 @@ function applyChain(ti,eff,t){
   const tailMuted=!!(AE._stopMuted||ta._tailMuted||tr.muted);
   const sdNow=stepDur(curPat());
   const chainKey=[A[4],A[5],A[6],F[0],F[1],F[2],F[3],E[0],E[1],E[2],E[3],E[4],E[5],E[6],E[7],tr.level,tr.out,sdNow.toFixed(5),tailMuted?1:0,S.playing?1:0,
+    Math.round(ta.curFreq||440),tr.hpTrack===false?0:1,tr.lpTrack===false?0:1,
     MACH[tr.machine].fx?eff.SYN.join(','):''].join('|');
   if(ta._chainKey===chainKey&&t>=ta.fltEnvUntil) return;
   ta._chainKey=chainKey;
@@ -2942,16 +3236,24 @@ function applyChain(ti,eff,t){
     if(A[4]<=64){ ta.distPre.gain.value=(A[4]+4)/68; ta.dist.curve=distCurveFor(1); ta.distPost.gain.value=1; }
     else { const k=1+(A[4]-64)/63*36; ta.distPre.gain.value=1; ta.dist.curve=distCurveFor(k); ta.distPost.gain.value=0.9; }
   }
-  // SRR
-  if(AE.workletOK&&ta.crush.parameters){ const f=1+Math.round(Math.pow(E[2]/127,1.7)*70); ta.crush.parameters.get('factor').setTargetAtTime(f,t,0.02); setQuant(ta.crushQ,16); }
-  else setQuant(ta.crushQ, 16-Math.round(E[2]/127*12));
-  // filter static position (env guarded in noteOn scheduling)
-  if(t>=ta.fltEnvUntil){
-    ta.hp.frequency.setTargetAtTime(FREQ(F[0]),t,0.02);
-    const lp=FREQ(F[0]+F[1]); ta.lp1.frequency.setTargetAtTime(lp,t,0.02); ta.lp2.frequency.setTargetAtTime(lp,t,0.02);
+  // SRR: the hardware reaches only about a 16x reduction (44.1k -> 2.8k)
+  // and joins the decimated samples with straight lines (WASM worklet).
+  const srrFactor=1+Math.pow(E[2]/127,1.7)*15;
+  if(AE.workletOK&&ta.crush.parameters){
+    ta.crush.parameters.get('factor').setTargetAtTime(srrFactor,t,0.02);
+    const bits=ta.crush.parameters.get('bits'); if(bits) bits.setTargetAtTime(16,t,0.02);
+    setQuant(ta.crushQ,16);
+    if(ta.srrLp) ta.srrLp.frequency.setTargetAtTime(19000,t,0.02);
   }
+  else {
+    setQuant(ta.crushQ, 16-Math.round(E[2]/127*8));
+    if(ta.srrLp) ta.srrLp.frequency.setTargetAtTime(E[2]<=0?19000:clamp(18000/srrFactor,1200,18000),t,0.02);
+  }
+  // filter static position (env guarded in noteOn scheduling)
+  if(t>=ta.fltEnvUntil) setFilterTargets(ta,tr,F[0],F[1],t,0.02,F[3]);
   ta.hp.Q.setTargetAtTime(QMAP(F[2])*0.7,t,0.02);
-  ta.lp1.Q.setTargetAtTime(QMAP(F[3]),t,0.02); ta.lp2.Q.setTargetAtTime(QMAP(F[3])*0.6,t,0.02);
+  if(ta.hp2) ta.hp2.Q.setTargetAtTime(0.5,t,0.02);
+  ta.lp1.Q.setTargetAtTime(QMAP(F[3]),t,0.02); ta.lp2.Q.setTargetAtTime(QMAP(F[3])*0.5,t,0.02);
   ta.eq.frequency.setTargetAtTime(FREQ(E[0]+8),t,0.02);
   ta.eq.gain.setTargetAtTime((E[1]-64)/63*15,t,0.02);
   if(ta.pan.pan) ta.pan.pan.setTargetAtTime((A[6]-64)/63,t,0.02);
@@ -2990,13 +3292,20 @@ function scheduleAmpEnv(param,eff,t,peak,lenSec){
 function releaseAmp(param,t,relTauV){ param.cancelScheduledValues(t); try{param.setValueAtTime(Math.max(0.0001,param.value),t);}catch(e){} param.setTargetAtTime(0,t,Math.max(0.004,relTauV)); }
 function scheduleFiltEnv(ta,eff,t){
   const F=eff.FILT, atk=atkSec(F[4]), decT=decTau(F[5]);
-  const b0=F[0], wEnd=F[0]+F[1], bPk=clamp(b0+(F[6]-64)*1.4,0,140), wPk=clamp(wEnd+(F[7]-64)*1.4,0,150);
-  if((F[6]===64&&F[7]===64)) return;
-  const hd=t+Math.max(0.001,atk);
-  [ta.hp,ta.lp1,ta.lp2].forEach(f=>f.frequency.cancelScheduledValues(t));
-  ta.hp.frequency.setValueAtTime(FREQ(b0),t); ta.hp.frequency.linearRampToValueAtTime(FREQ(bPk),hd); ta.hp.frequency.setTargetAtTime(FREQ(b0),hd,Math.max(0.005,decT));
-  const lpS=FREQ(wEnd), lpP=FREQ(wPk);
-  [ta.lp1,ta.lp2].forEach(f=>{ f.frequency.setValueAtTime(lpS,t); f.frequency.linearRampToValueAtTime(lpP,hd); f.frequency.setTargetAtTime(lpS,hd,Math.max(0.005,decT)); });
+  if(F[6]===64&&F[7]===64) return;
+  const tr=curPat().tracks[ta.idx];
+  const off=raw=>{ const d=raw-64; return 7*d*Math.abs(d)/256; }; // BOFS/WOFS step law
+  const p0=filtPoleFreqs(ta,tr,F[0],F[1],F[3]);
+  const ppk=filtPoleFreqs(ta,tr,F[0]+off(F[6]),F[1]+off(F[7]),F[3]);
+  const hd=t+Math.max(0.001,atk), tau=Math.max(0.005,decT);
+  const nodes=[[ta.hp,p0.hp,ppk.hp],[ta.hp2,p0.hpTail,ppk.hpTail],[ta.lp1,p0.lp,ppk.lp],[ta.lp2,p0.lpTail,ppk.lpTail]];
+  nodes.forEach(([node,start,peak])=>{
+    if(!node) return;
+    node.frequency.cancelScheduledValues(t);
+    node.frequency.setValueAtTime(start,t);
+    node.frequency.linearRampToValueAtTime(peak,hd);
+    node.frequency.setTargetAtTime(start,hd,tau);
+  });
   ta.fltEnvUntil=hd+decT*4;
 }
 
@@ -3021,35 +3330,47 @@ function startSweepOsc(osc,restart,t){
 const BUILDERS={
  GND(){ return {empty:true}; },
  SIN(v,f,P){ const o=mkOsc('sine',f); regOsc(v,o,1); o.connect(v.out); v.nodes.push(o); },
- NOIS(v,f,P){ const S=P.SYN; const st={width:S[0],red:S[1],on:S[2]>=64};
-   const rateFor=redRaw=>Math.max(0.05,(0.25+(v.baseF||f)/220)*(1-redRaw/127*0.85));
-   const mkSide=(buffer)=>{
-     const rate=rateFor(st.red), n=noiseSrc(rate,true,buffer);
-     v.oscs.push({o:n,ratio:1,det:0,rate0:rate});
-     const bp=mkFilter('bandpass',clamp(f*(1+st.red/127*3),60,16000),0.8);
-     const g=mkGain(0.62), pan=AE.ctx.createStereoPanner?AE.ctx.createStereoPanner():mkGain(1);
-     n.connect(bp); bp.connect(g); g.connect(pan); if(pan.connect)pan.connect(v.out); v.nodes.push(n);
-     return {n,bp,g,pan};
+ NOIS(v,f,P){ const S=P.SYN; const st={mix:S[0],red:S[1],on:S[2]>=64};
+   // GND-NOIS is unpitched on the hardware. ST mixes in a second,
+   // independent stream; STON puts that stream in the side channel
+   // (L=A+B, R=A-B) instead of the middle. RED darkens both streams.
+   const colorHz=redRaw=>clamp(18000*Math.pow(0.012,clamp(redRaw,0,127)/127),180,18000);
+   const colorComp=redRaw=>1+1.7*Math.pow(clamp(redRaw,0,127)/127,2);
+   const mkStream=(buffer)=>{
+     const n=noiseSrc(1,true,buffer);
+     if(n.detune) n.detune.value=Math.random()*24-12;
+     const lp=mkFilter('lowpass',colorHz(st.red),0.5);
+     const g=mkGain(0.68*colorComp(st.red));
+     n.connect(lp); lp.connect(g); v.nodes.push(n);
+     return {n,lp,g};
    };
-   const L=mkSide(AE.noiseBuf), R=mkSide(AE.noiseBufR||AE.noiseBuf);
+   const A=mkStream(AE.noiseBuf); A.g.connect(v.out);
+   const B=mkStream(AE.noiseBufR||AE.noiseBuf);
+   const bL=mkGain(0), bR=mkGain(0);
+   let merger=null;
+   try{ merger=AE.ctx.createChannelMerger?AE.ctx.createChannelMerger(2):null; }catch(e){ merger=null; }
+   if(merger){ B.g.connect(bL); B.g.connect(bR); bL.connect(merger,0,0); bR.connect(merger,0,1); merger.connect(v.out); }
+   else { B.g.connect(bL); bL.connect(v.out); }
    const applyStereo=()=>{
-     const w=st.on?st.width/127:0, t=nowT();
-     if(L.pan.pan) L.pan.pan.setTargetAtTime(-w,t,0.03);
-     if(R.pan.pan) R.pan.pan.setTargetAtTime(w,t,0.03);
-     L.g.gain.setTargetAtTime(st.on?0.62:0.9,t,0.03);
-     R.g.gain.setTargetAtTime(st.on?0.62:0,t,0.03);
+     const b=st.mix/127, t=nowT(); // B.g already carries level/colour compensation
+     bL.gain.setTargetAtTime(b,t,0.03);
+     bR.gain.setTargetAtTime(st.on?-b:b,t,0.03);
+   };
+   const applyColor=()=>{
+     const hz=colorHz(st.red), comp=colorComp(st.red), t=nowT();
+     [A,B].forEach(s=>{ s.lp.frequency.setTargetAtTime(hz,t,0.03); s.g.gain.setTargetAtTime(0.68*comp,t,0.03); });
+     applyStereo();
    };
    applyStereo();
-   // ST = stereo width, RED = colour, STON = stereo on/off (Appendix A).
-   v.syn[0]=val=>{ st.width=val; applyStereo(); };
-   v.syn[1]=val=>{ st.red=val; const r=rateFor(val), t=nowT(); [L,R].forEach(side=>{ side.n.playbackRate.setTargetAtTime(r,t,0.03); side.bp.frequency.setTargetAtTime(clamp((v.baseF||f)*(1+val/127*3),60,16000),t,0.03); }); };
+   v.syn[0]=val=>{ st.mix=val; applyStereo(); };
+   v.syn[1]=val=>{ st.red=val; applyColor(); };
    v.syn[2]=val=>{ st.on=val>=64; applyStereo(); };
  },
  SID(v,f,P,ti){ const S=P.SYN, wave=enumIdx(MACH.SID.syn[3],S[3]), mod=enumIdx(MACH.SID.syn[4],S[4]), msrc=enumIdx(MACH.SID.syn[5],S[5]);
    const sh=AE.ctx.createWaveShaper(); setQuant(sh,10); const post=mkGain(0.9); sh.connect(post); post.connect(v.out); v.nodes.push(sh);
    let carrierIn=sh, ringG=null;
    if(mod===1){ ringG=mkGain(0); ringG.connect(sh); carrierIn=ringG; v.nodes.push(ringG); }
-   const pw01=0.5+(S[0]-64)/127; const p=pulseOsc(f,clamp(pw01,0.03,0.97)); regOsc(v,p.osc,1); v.nodes.push(p);
+   const p=pulseOsc(f,sidDuty(S[0])); regOsc(v,p.osc,1); v.nodes.push(p);
    const mk=o=>{o.connect(carrierIn);};
    if(wave===1){ const o=mkOsc('sawtooth',f); regOsc(v,o,1); mk(o); v.nodes.push(o); }
    else if(wave===0){ const o=mkOsc('triangle',f); regOsc(v,o,1); mk(o); v.nodes.push(o); }
@@ -3062,7 +3383,7 @@ const BUILDERS={
    const mf = msrc===1? (AE.tracks[(ti+5)%6].curFreq||f) : f*(0.25+Math.pow(S[6]/127,1.6)*15.75);
    if(mod===1){ const m=mkOsc('sine',mf), mg=mkGain(1); m.connect(mg); mg.connect(ringG.gain); v.nodes.push(m); regOsc(v,m,mf/f); }
    if(mod===2){ const m=mkOsc('sine',mf), mg=mkGain(f*(1+S[6]/127*3)); m.connect(mg); v.oscs.forEach(x=>{if(x.o.frequency)mg.connect(x.o.frequency);}); v.nodes.push(m); }
-   v.syn[0]=val=>{ p.pwParam.setTargetAtTime(pwToOffset(0.5+(val-64)/127),nowT(),0.02); };
+   v.syn[0]=val=>{ p.pwParam.setTargetAtTime(pwToOffset(sidDuty(val)),nowT(),0.02); };
  },
  SAW(v,f,P){ const S=P.SYN, unil=S[0]/127, uniw=S[1]/127*55, unix=S[2]/127;
    const add=(type,ratio,det,lvl,freqMul=1)=>{ const o=mkOsc(type,f*ratio*freqMul); regOsc(v,o,ratio*freqMul,det); const g=mkGain(lvl); o.connect(g); g.connect(v.out); v.nodes.push(o); return o; };
@@ -3072,14 +3393,14 @@ const BUILDERS={
    if(S[5]>0) add('sine',0.5,0,0.55*S[5]/127);
    if(S[6]>0) add('sine',0.25,0,0.55*S[6]/127);
  },
- PULS(v,f,P){ const S=P.SYN, unil=S[0]/127, uniw=S[1]/127*45, pw01=clamp(0.5+(S[4]-64)/127,0.04,0.96);
+ PULS(v,f,P){ const S=P.SYN, unil=S[0]/127, uniw=S[1]/127*45, pw01=pulsDuty(S[4]);
    const mkp=(det,lvl)=>{ const p=pulseOsc(f,pw01); regOsc(v,p.osc,1,det); if(det)p.osc.detune.value=det; const g=mkGain(lvl); p.out.connect(g); g.connect(v.out); v.nodes.push(p); return p; };
    const p0=mkp(0,0.6); let pAll=[p0];
    if(unil>0.01){ pAll.push(mkp(uniw,0.45*unil)); pAll.push(mkp(-uniw,0.45*unil)); }
    if(S[2]>0){ const o=mkOsc('sine',f/2); regOsc(v,o,0.5); const g=mkGain(0.5*S[2]/127); o.connect(g); g.connect(v.out); v.nodes.push(o); }
    if(S[3]>0){ const o=mkOsc('sine',f/4); regOsc(v,o,0.25); const g=mkGain(0.5*S[3]/127); o.connect(g); g.connect(v.out); v.nodes.push(o); }
    if(S[5]>0){ const lfo=mkOsc('triangle',0.12+S[5]/127*4.5); pAll.forEach(p=>{ const lg=mkGain(S[5]/127*0.7); lfo.connect(lg); lg.connect(p.pwParam); }); v.nodes.push(lfo); startSweepOsc(lfo,S[6]>=64,arguments[5]); }
-   v.syn[4]=val=>pAll.forEach(p=>p.pwParam.setTargetAtTime(pwToOffset(0.5+(val-64)/127),nowT(),0.02));
+   v.syn[4]=val=>pAll.forEach(p=>p.pwParam.setTargetAtTime(pwToOffset(pulsDuty(val)),nowT(),0.02));
  },
  ENS(v,f,P){ ensVoice(v,f,P,null); },
  DENS(v,f,P){ ensVoice(v,f,P,getWave64(enumIdx(MACH.DENS.syn[3],P.SYN[3]))); },
@@ -3108,30 +3429,64 @@ const BUILDERS={
  },
  BBOX(v,f,P,ti,midi,t,lenSec){ bboxVoice(v,f,P,midi,t,lenSec); },
  FMSTAT(v,f,P){ const S=P.SYN;
+   // Two sine modulators in parallel on one carrier. Depth is an FM index:
+   // Hz deviation = index x modulator Hz. TONE is two one-poles in each
+   // modulator path (not a filter on the carrier output).
    const car=mkOsc('sine',f); regOsc(v,car,1);
-   const tone=mkFilter('lowpass',250+Math.pow(S[6]/127,1.6)*14000,0.5); const cg=mkGain(0.75); car.connect(tone); tone.connect(cg); cg.connect(v.out);
-   const m1=mkOsc('sine',f*fmRatio(S[0])); regOsc(v,m1,fmRatio(S[0]),(S[1]-64)); m1.detune.value=(S[1]-64);
-   const g1=mkGain(0); m1.connect(g1); g1.connect(car.frequency);
-   if(S[3]>0){ const fb=mkGain(S[3]/127*f*1.4); m1.connect(fb); fb.connect(m1.frequency); }
-   const m2=mkOsc('sine',f*fmRatio(S[4])); regOsc(v,m2,fmRatio(S[4])); const g2=mkGain(S[5]/127*0.5); m2.connect(g2); g2.connect(tone);
-   v.nodes.push(car,m1,m2); v._fmEnv=[{g:g1,raw:S[2],f}];
-   v.syn[2]=val=>g1.gain.setTargetAtTime(val/127*f*3.2,nowT(),0.03);
+   const cg=mkGain(0.72); car.connect(cg); cg.connect(v.out);
+   const toneFilters=[];
+   const modPath=(m)=>{
+     const lp1=mkFilter('lowpass',fmToneHz(S[6]),0.5), lp2=mkFilter('lowpass',fmToneHz(S[6]),0.5), g=mkGain(0);
+     m.connect(lp1); lp1.connect(lp2); lp2.connect(g); g.connect(car.frequency);
+     toneFilters.push(lp1,lp2); v.nodes.push(lp1,lp2); return g;
+   };
+   const r1=fmRatio(S[0]), fine=0.75+S[1]/127*0.5, m1Hz=Math.max(1,f*r1*fine);
+   const m1=mkOsc('sine',m1Hz); regOsc(v,m1,r1*fine);
+   const g1=modPath(m1);
+   const fb=mkGain(S[3]/127*m1Hz*1.35); m1.connect(fb); fb.connect(m1.frequency);
+   const r2=fmRatio(S[4]), m2Hz=Math.max(1,f*r2), m2=mkOsc('sine',m2Hz); regOsc(v,m2,r2);
+   const g2=modPath(m2); g2.gain.value=fmIndexPeak(S[5])*m2Hz;
+   v.nodes.push(car,m1,m2); v._fmEnv=[{g:g1,raw:S[2],modHz:m1Hz,scale:1,mode:'stat'}];
+   v.syn[2]=val=>g1.gain.setTargetAtTime(fmIndexPeak(Math.min(val,64))*m1Hz,nowT(),0.03);
+   v.syn[3]=val=>fb.gain.setTargetAtTime(val/127*m1Hz*1.35,nowT(),0.03);
+   v.syn[5]=val=>g2.gain.setTargetAtTime(fmIndexPeak(val)*m2Hz,nowT(),0.03);
+   v.syn[6]=val=>toneFilters.forEach(fl=>fl.frequency.setTargetAtTime(fmToneHz(val),nowT(),0.03));
  },
  FMPAR(v,f,P){ const S=P.SYN;
    const car=mkOsc('sine',f); regOsc(v,car,1);
-   const tone=mkFilter('lowpass',250+Math.pow(S[6]/127,1.6)*14000,0.5); const cg=mkGain(0.75); car.connect(tone); tone.connect(cg); cg.connect(v.out);
-   v._fmEnv=[];
-   [[0,1],[2,3],[4,5]].forEach(([fi,ei])=>{ const m=mkOsc('sine',f*fmRatio(S[fi])); regOsc(v,m,fmRatio(S[fi])); const g=mkGain(0); m.connect(g); g.connect(car.frequency); v.nodes.push(m); v._fmEnv.push({g,raw:S[ei],f}); v.syn[ei]=val=>g.gain.setTargetAtTime(val/127*f*2.6,nowT(),0.03); });
+   const cg=mkGain(0.72); car.connect(cg); cg.connect(v.out);
+   const toneFilters=[]; v._fmEnv=[];
+   [[0,1],[2,3],[4,5]].forEach(([fi,ei])=>{
+     const r=fmRatio(S[fi]), hz=Math.max(1,f*r), m=mkOsc('sine',hz); regOsc(v,m,r);
+     const lp1=mkFilter('lowpass',fmToneHz(S[6]),0.5), lp2=mkFilter('lowpass',fmToneHz(S[6]),0.5), g=mkGain(0);
+     m.connect(lp1); lp1.connect(lp2); lp2.connect(g); g.connect(car.frequency);
+     toneFilters.push(lp1,lp2); v.nodes.push(m,lp1,lp2);
+     v._fmEnv.push({g,raw:S[ei],modHz:hz,scale:1,mode:'par'});
+     v.syn[ei]=val=>g.gain.setTargetAtTime(fmIndexPeak(Math.min(val,64))*hz,nowT(),0.03);
+   });
    v.nodes.push(car);
+   v.syn[6]=val=>toneFilters.forEach(fl=>fl.frequency.setTargetAtTime(fmToneHz(val),nowT(),0.03));
  },
- FMDYN(v,f,P,ti,midi,t){ const S=P.SYN;
-   const car=mkOsc('sine',f); regOsc(v,car,1); const cg=mkGain(0.78); car.connect(cg); cg.connect(v.out);
-   const r1=fmRatio(S[0]), m1=mkOsc('sine',f*r1); regOsc(v,m1,r1); const g1=mkGain(0); m1.connect(g1); g1.connect(car.frequency);
-   // 1FEN: pitch envelope on modulator 1
-   const fenv=(S[1]-64)/63; m1.frequency.setValueAtTime(Math.max(8,f*r1*Math.pow(2,fenv*2)),t); m1.frequency.exponentialRampToValueAtTime(Math.max(8,f*r1),t+0.04+Math.abs(fenv)*0.5);
-   const m2=mkOsc('sine',f*fmRatio(S[4])); regOsc(v,m2,fmRatio(S[4])); const g2=mkGain(0); m2.connect(g2); g2.connect(m1.frequency);
-   if(S[6]>0){ const fb=mkGain(S[6]/127*f*1.6); m2.connect(fb); fb.connect(m2.frequency); }
-   v.nodes.push(car,m1,m2); v._fmEnv=[{g:g1,raw:S[3],vol:S[2],f},{g:g2,raw:S[5],f}];
+ FMDYN(v,f,P,ti,midi,t){ const S=P.SYN, tt=t||nowT();
+   // Continuous ratios, parallel operators, no TONE low-pass, and the
+   // hardware's 1.125x version of FM+STAT's depth law.
+   const car=mkOsc('sine',f); regOsc(v,car,1); const cg=mkGain(0.74); car.connect(cg); cg.connect(v.out);
+   const r1=S[0]/64, m1Hz=Math.max(0.01,f*r1), m1=mkOsc('sine',m1Hz); regOsc(v,m1,r1);
+   const g1=mkGain(0); m1.connect(g1); g1.connect(car.frequency);
+   let dyn={vol:S[2],ven:S[3]};
+   const d0=fmDynDepth(dyn.vol,dyn.ven);
+   const fen=S[1]-64, fenHz=fen>=0?1.35*fen*fen:-0.3375*fen*fen;
+   if(fen!==0){ m1.frequency.setValueAtTime(Math.max(0.01,r1*(f+fenHz)),tt); m1.frequency.setTargetAtTime(m1Hz,tt,Math.max(0.003,fmDynSeconds(S[3])/3)); }
+   const r2=Math.pow(S[4]/64,2), m2Hz=Math.max(0.01,f*r2), m2=mkOsc('sine',m2Hz); regOsc(v,m2,r2);
+   const g2=mkGain(0); m2.connect(g2); g2.connect(car.frequency);
+   const fb=mkGain(S[6]/127*m2Hz*1.35); m2.connect(fb); fb.connect(m2.frequency);
+   v.nodes.push(car,m1,m2);
+   v._fmEnv=[{g:g1,custom:true,peak:d0.peak,rest:d0.rest,sec:d0.sec,modHz:m1Hz,scale:1.125},{g:g2,raw:S[5],modHz:m2Hz,scale:1.125}];
+   const setDynRest=()=>{ const d=fmDynDepth(dyn.vol,dyn.ven); g1.gain.setTargetAtTime(d.rest*1.125*m1Hz,nowT(),0.03); };
+   v.syn[2]=val=>{ dyn.vol=val; setDynRest(); };
+   v.syn[3]=val=>{ dyn.ven=val; setDynRest(); };
+   v.syn[5]=val=>g2.gain.setTargetAtTime(fmIndexPeak(Math.min(val,64))*1.125*m2Hz,nowT(),0.03);
+   v.syn[6]=val=>fb.gain.setTargetAtTime(val/127*m2Hz*1.35,nowT(),0.03);
  },
  VO6(v,f,P,ti,midi,t){ const S=P.SYN, ctx=AE.ctx;
    const voiced=mkOsc('square',f); regOsc(v,voiced,1); const vlp=mkFilter('lowpass',2400,0.4);
@@ -3235,6 +3590,31 @@ function bboxVoice(v,f,P,midi,t,lenSec){
 
 /* ---------- note on/off ---------- */
 function tuneOf(tr,eff){ const defs=MACH[tr.machine].syn; const i=defs.findIndex(d=>d&&d.n==='TUNE'); return i>=0? tuneSemis(eff.SYN[i]) : 0; }
+// Fast percussive pitch must run on the audio clock, not the 12/25ms
+// UI/LFO timer. Preserve all other LFO shapes/modes via the existing path.
+function audioPitchSpecs(eff,bpm){
+  if(!AE.ctx||!AE.ctx.createConstantSource) return null;
+  const specs=[];
+  for(let li=1;li<=3;li++){
+    const L=eff['LFO'+li], D=PAGE_DEFS.LFO1;
+    if(!L[7]||LFO_PAGES[enumIdx(D[0],L[0])]!=='PTCH') continue;
+    if(enumIdx(D[2],L[2])!==4||enumIdx(D[3],L[3])!==5||L[6]) return null;
+    const hz=(bpm/60)/4*LFO_MULTVAL[enumIdx(D[4],L[4])]*Math.pow(2,(L[5]-64)/30);
+    specs.push({cents:L[7]/127*PTCH_SCALES[enumIdx(D[1],L[1])],duration:0.5/hz});
+  }
+  return specs.length?specs:null;
+}
+function scheduleAudioPitch(v,specs,t){
+  if(!specs||!v.oscs.length) return;
+  specs.forEach(spec=>{
+    const src=AE.ctx.createConstantSource();
+    src.offset.setValueAtTime(spec.cents,t);
+    src.offset.linearRampToValueAtTime(0,t+spec.duration);
+    v.oscs.forEach(x=>{ if(x.o.detune) src.connect(x.o.detune); });
+    v.nodes.push(src);
+  });
+  v._audioPitch=true;
+}
 AE.noteOn=function(ti,midi,t,vel=1,opt={}){
   if(!AE.started) return null;
   if(AE._stopMuted) clearStopMute();
@@ -3242,6 +3622,8 @@ AE.noteOn=function(ti,midi,t,vel=1,opt={}){
   const eff=effParams(tr,opt.locks,ti);
   const lenSec=opt.len||0.3;
   const tune=tuneOf(tr,eff);
+  const pitchSpecs=opt.ltrig!==false?audioPitchSpecs(eff,curPat().bpm):null;
+  if(pitchSpecs) eff._ptchCents=0; // no stale previous-note pitch snapshot
   const f=mtof(midi+tune+(eff._ptchCents||0)/100);
   ta.curFreq=f; ta.curNote=midi;
   // LFO trig modes (hardware patterns can trig AMP / FILTER / LFO independently)
@@ -3277,7 +3659,11 @@ AE.noteOn=function(ti,midi,t,vel=1,opt={}){
   if(portSec>0&&ta._prevF&&ta._prevF!==f){ const pf=ta._prevF; v.oscs.forEach(x=>{ if(x.o.frequency){ x.o.frequency.setValueAtTime(Math.max(8,pf*x.ratio),t); x.o.frequency.exponentialRampToValueAtTime(Math.max(8,f*x.ratio),t+portSec); } }); }
   ta._prevF=f;
   // FM internal envelopes
-  if(v._fmEnv) v._fmEnv.forEach(({g,raw,vol})=>{ const amt=(vol!=null?vol/127:1)*(raw/127); const dev=amt*f*4.2; g.gain.setValueAtTime(dev,t); g.gain.setTargetAtTime(dev*0.22,t,0.02+raw/127*0.5); });
+  if(v._fmEnv) v._fmEnv.forEach(e=>{
+    if(e.custom){ const scale=e.scale||1, hz=Math.max(0.01,e.modHz||f); e.g.gain.cancelScheduledValues(t); e.g.gain.setValueAtTime(e.peak*scale*hz,t); e.g.gain.setTargetAtTime(e.rest*scale*hz,t,Math.max(0.003,(e.sec||1)/3)); }
+    else scheduleFmEnv(e.g.gain,e.raw,e.modHz||f,t,e.scale||1,e.mode||'stat');
+  });
+  scheduleAudioPitch(v,pitchSpecs,t);
   if(v._bboxStart){ /* sample voice starts itself */ v._bboxStart(t); }
   else v.startAll(t);
   v.nodes.forEach(n=>{ if(n.start&&!n._st){ try{ if(n!==v){} }catch(e){} }});
@@ -3317,7 +3703,7 @@ function silenceTrack(ta,tr,t,flush){
   // look-ahead notes could therefore reopen the gate seconds later. Cancel them.
   setParamFast(ta.ampEnv.gain,t,0,0.01);
   setParamFast(ta.lfoVol&&ta.lfoVol.gain,t,1,0.01);
-  [ta.hp,ta.lp1,ta.lp2].forEach(f=>{ if(f&&f.frequency) try{f.frequency.cancelScheduledValues(t);}catch(e){} });
+  [ta.hp,ta.hp2,ta.lp1,ta.lp2].forEach(f=>{ if(f&&f.frequency) try{f.frequency.cancelScheduledValues(t);}catch(e){} });
   ta.fltEnvUntil=0;
   if(flush){
     ta._tailMuted=true; ta._chainKey=null;
@@ -3399,15 +3785,20 @@ function lfoTick(){
       let val=ls.val;
       if(Lp[6]>0){ const gates=2+Lp[6]/6; if(((ls.ph*gates)%1)<0.5) val=0; } // INTL interlace
       const page=LFO_PAGES[enumIdx(PAGE_DEFS.LFO1[0],Lp[0])], dest=enumIdx(PAGE_DEFS.LFO1[1],Lp[1]);
-      if(page==='PTCH') ptchCents+=val*(dpth/127)*PTCH_SCALES[dest];
+      if(page==='PTCH'){ if(!(ta.voice&&ta.voice._audioPitch)) ptchCents+=val*(dpth/127)*PTCH_SCALES[dest]; }
       else { const k=page+'.'+dest; off[k]=(off[k]||0)+val*dpth; }
     }
     off.PTCH=ptchCents; AE.lfoOff[ti]=off;
     // continuous application
     const has=k=>off[k]!==undefined;
-    if(ptchCents&&ta.voice) ta.voice.oscs.forEach(x=>{ if(x.o.detune) x.o.detune.setTargetAtTime((x.det||0)+ptchCents,t,0.025); });
-    if((has('FILT.0')||has('FILT.1'))&&t>=ta.fltEnvUntil){ const F=tr.params.FILT; const b=R127(F[0]+(off['FILT.0']||0)); const w=F[1]+(off['FILT.1']||0);
-      ta.hp.frequency.setTargetAtTime(FREQ(b),t,0.025); const lp=FREQ(b+w); ta.lp1.frequency.setTargetAtTime(lp,t,0.025); ta.lp2.frequency.setTargetAtTime(lp,t,0.025); }
+    // Also restore neutral detune when depth is turned off. Native pitch
+    // sources add to detune; never bake their current value into the base.
+    if(ta.voice&&ta.voice._lastPitchCents!==ptchCents){
+      ta.voice._lastPitchCents=ptchCents;
+      ta.voice.oscs.forEach(x=>{ if(x.o.detune) x.o.detune.setTargetAtTime((x.det||0)+ptchCents,t,0.01); });
+    }
+    if((has('FILT.0')||has('FILT.1'))&&t>=ta.fltEnvUntil){ const F=tr.params.FILT; const b=R127(F[0]+(off['FILT.0']||0)); const w=R127(F[1]+(off['FILT.1']||0));
+      setFilterTargets(ta,tr,b,w,t,0.025,F[3]); }
     if(has('AMP.5')) ta.lfoVol.gain.setTargetAtTime(clamp(1+off['AMP.5']/110,0,1.6),t,0.025);
     if(has('AMP.6')&&ta.pan.pan) ta.pan.pan.setTargetAtTime(clamp(((tr.params.AMP[6]+off['AMP.6'])-64)/63,-1,1),t,0.025);
     if(has('EFX.4')&&!AE._stopMuted&&!ta._tailMuted&&!tr.muted) ta.dSend.gain.setTargetAtTime(clamp(Math.pow(R127(tr.params.EFX[4]+off['EFX.4'])/127,1.5),0,1),t,0.025);
@@ -3554,6 +3945,7 @@ function initUiStateFields(){
   if(!S._rndMachines) S._rndMachines='THEME';
   if(!S._rndTheme) S._rndTheme='AUTO';
   if(S.lang!=='en'&&S.lang!=='ru') S.lang='ru';
+  if(!['auto','lite','full'].includes(S.perfMode)) S.perfMode='auto';
   return true;
 }
 initUiStateFields();
@@ -3589,7 +3981,11 @@ ru:{
   factoryConfirm:'Сбросить всё к заводским паттернам?', transpNote:'TRSP на странице ARP транспонирует трек на лету, не трогая шаги.',
   setupTitle:'GLOBAL / SETUP — Monomachine Web', language:'ЯЗЫК / LANGUAGE', settings:'НАСТРОЙКИ', shortcuts:'БЫСТРЫЙ ДОСТУП',
   setupNote:'GLOBAL открывается как FUNCTION + KIT/SONG. Язык сохраняется на устройстве; интерфейс, справка и диагностика переключаются сразу.',
+  performance:'СКОРОСТЬ / IPAD 5', perfAuto:'АВТО', perfLiteBtn:'LITE · IPAD 5', perfFull:'ПОЛНАЯ', perfNow:'Сейчас: {mode}.',
+  perfNote:'LITE убирает тяжёлые тени и градиенты, реже обновляет LFO/LCD, ограничивает реверб и предпочитает звук 44,1 кГц. Панель и звук переключаются сразу; частота AudioContext и банк волн обновятся после перезагрузки страницы.',
+  mixerKeyNote:'HP KEY / LP KEY: трекинг фильтра за нотой, как KIT → ASSIGN → KEY на железке. OFF фиксирует срез относительно MIDI-ноты 0 — полезно для дронов и одинакового среза на всех нотах.',
   inputEnable:'🎤 INP AB: ВКЛ ВХОД', midiConnect:'MIDI: ПОДКЛЮЧИТЬ', helpGuide:'СПРАВКА + SOPHIE-РЕЦЕПТЫ', helpTitle:'СПРАВКА — игра, FX и SOPHIE-звуки',
+  materialSounds:'МАТЕРИАЛЫ → ТЕКУЩИЙ ТРЕК', materialNote:'Авторские синтезированные этюды, не оригинальные патчи или сэмплы SOPHIE. Кнопка меняет звук выбранного трека; ноты и локи сохраняются. POWER + остановленный секвенсор: можно сразу прослушать звук. Старые сохранения не перезаписываются обновлением.',
   sophieGroup:'SOPHIE XE — МАТЕРИАЛЫ A09–A12', sophieNote:'A09 ELASTIC, A10 PLASTIC, A11 Latex, A12 GLASSLAB. В KITS выберите THEME → SOPHIE XE для эластичных FM, пластика, стекла, squeak-шума и VO-6.',
   backToGlobal:'← GLOBAL', wavReadyShare:'WAV ГОТОВ {time}', wavShareCanceled:'WAV СОХРАНЁН В ПАМЯТИ — FILE → ПОСЛЕДНИЙ WAV', wavFallback:'WAV REC · FALLBACK',
   euclidDensity:'Плотность 0.1–0.9:', osUpgradeConfirm:'Похоже на OS upgrade SysEx. Отправлять на настоящую Monomachine только если она специально переведена в режим OS UPGRADE. Продолжить?',
@@ -3652,7 +4048,11 @@ en:{
   factoryConfirm:'Reset everything to the factory patterns?', transpNote:'TRSP on the ARP page transposes the track live without changing its steps.',
   setupTitle:'GLOBAL / SETUP — Monomachine Web', language:'LANGUAGE / ЯЗЫК', settings:'SETTINGS', shortcuts:'SHORTCUTS',
   setupNote:'GLOBAL is FUNCTION + KIT/SONG. The language is saved on this device; the interface, help and diagnostics switch immediately.',
+  performance:'PERFORMANCE / IPAD 5', perfAuto:'AUTO', perfLiteBtn:'LITE · IPAD 5', perfFull:'FULL', perfNow:'Now: {mode}.',
+  perfNote:'LITE removes heavy shadows and gradients, updates the LFOs/LCD less often, caps the reverb and prefers 44.1 kHz audio. The panel and running audio switch immediately; the AudioContext rate and wave bank refresh after a page reload.',
+  mixerKeyNote:'HP KEY / LP KEY: filter key tracking, as in KIT → ASSIGN → KEY on the hardware. OFF fixes the cutoff against MIDI note 0 — useful for drones and the same cutoff on every note.',
   inputEnable:'🎤 INP AB: ENABLE INPUT', midiConnect:'MIDI: CONNECT', helpGuide:'HELP + SOPHIE RECIPES', helpTitle:'HELP — playing, FX and SOPHIE-style sounds',
+  materialSounds:'MATERIALS → CURRENT TRACK', materialNote:'Original synthesized studies, not SOPHIE’s original patches or samples. Each button changes the selected track sound; notes and locks stay intact. With POWER on and the sequencer stopped, it also auditions the sound. Updates never overwrite saved patterns.',
   sophieGroup:'SOPHIE XE — MATERIALS A09–A12', sophieNote:'A09 ELASTIC, A10 PLASTIC, A11 Latex, A12 GLASSLAB. In KITS choose THEME → SOPHIE XE for elastic FM, plastic, glass, squeaky noise and VO-6 materials.',
   backToGlobal:'← GLOBAL', wavReadyShare:'WAV READY {time}', wavShareCanceled:'WAV KEPT IN MEMORY — FILE → LAST WAV', wavFallback:'WAV REC · FALLBACK',
   euclidDensity:'Density 0.1–0.9:', osUpgradeConfirm:'This looks like an OS upgrade SysEx file. Send it to a real Monomachine only when the machine has explicitly been put into OS UPGRADE mode. Continue?',
@@ -3707,6 +4107,27 @@ function setLanguage(lang){
   if(sheetType&&SHEETS[sheetType]) openSheet(sheetType);
   renderAll(); updateWavRecUI();
   showMsg(S.lang==='en'?'ENGLISH':'РУССКИЙ',1200);
+}
+function perfLiteActive(){
+  try{ if(document.documentElement.classList.contains('perf-lite')) return true; }catch(e){}
+  return !!(window.__monoBoot&&window.__monoBoot.perfLite);
+}
+function applyPerfMode(mode,opts={}){
+  if(!hasState()) return false;
+  S.perfMode=['auto','lite','full'].includes(mode)?mode:'auto';
+  let lite;
+  if(window.__monoSetPerfMode) lite=!!window.__monoSetPerfMode(S.perfMode);
+  else {
+    lite=S.perfMode==='lite';
+    try{ document.documentElement.classList.toggle('perf-lite',lite); }catch(e){}
+    if(window.__monoBoot){ window.__monoBoot.perfMode=S.perfMode; window.__monoBoot.perfLite=lite; }
+  }
+  try{ localStorage.setItem('monomachine_perf',S.perfMode); }catch(e){}
+  if(typeof AE!=='undefined'&&AE&&AE.setPerfLite) AE.setPerfLite(lite);
+  if(!opts.noSave) saveSoon();
+  if(opts.reopen!==false&&sheetType==='setup') openSheet('setup');
+  if(!opts.silent) showMsg(lite?'PERF LITE · IPAD':'PERF FULL',1200);
+  return lite;
 }
 /* Reliable hardware-style tap: native click can be cancelled when a finger
    moves a few pixels inside the scrollable iPhone panel, so a small, quick
@@ -3948,7 +4369,7 @@ function drawBoot(c,ink,bg){
   if(t>=1.03){ finishBoot(); return; }
   drawMLogoPx(c,51,5,3,ink);
   lcdPrint(c,'MONOMACHINE',64,24,{scale:2,color:ink,align:'center'});
-  lcdPrint(c,'SFX-60+ WEB OS V5.4.0',64,38,{color:ink,align:'center'});
+  lcdPrint(c,'SFX-60+ WEB OS V5.5.1',64,38,{color:ink,align:'center'});
   const blocks=clamp(Math.floor((t-0.16)/0.09),0,8);
   c.fillStyle=ink;
   for(let i=0;i<blocks;i++) c.fillRect(49+i*4,48,3,3);
@@ -3994,13 +4415,14 @@ function paintLCD(){
   lcdPrint(c,lcdFit(S.page+' '+p.kit,70),1,57,{color:ink});
   const mutes=p.tracks.map((tt,i)=>tt.muted?'X':(i+1)).join('');
   lcdPrint(c,(S.lockStep>=0?'LK'+(S.lockStep+1)+' ':'')+(S.seqPage+1)+':4 '+mutes,127,57,{color:ink,align:'right'});
+  const lite=perfLiteActive();
   const wipeAge=nowP-(S._lcdWipeT0||0);
-  if(wipeAge>=0&&wipeAge<130){
+  if(!lite&&wipeAge>=0&&wipeAge<130){
     const x=Math.floor(128*wipeAge/130);
     c.fillStyle=bg; c.fillRect(x,9,128-x,46);
     c.fillStyle=ink; c.fillRect(x,9,1,46);
   }
-  const popupAge=nowP-(S._popupT0||0);
+  const popupAge=lite?999:(nowP-(S._popupT0||0));
   if(S._popupUntil>nowP&&S._popupTxt) lcdWindow(c,[S._popupTxt,tempoEditActive()?'LEVEL = TEMPO':''],ink,bg,popupAge);
   else if(S.msg) lcdWindow(c,wrapLcd(S.msg,98),ink,bg,popupAge);
 }
@@ -4009,6 +4431,7 @@ function drawLCD(){ _lcdDirty=true; }
 let _lcdPopupWas=false;
 function lcdAnimActive(now){
   if(lcdMode==='boot') return true;
+  if(perfLiteActive()) return false; // no wipe/blink repaint loop on iPad-5-class GPUs
   const wipeAge=now-(S._lcdWipeT0||0);
   if(wipeAge>=0&&wipeAge<170) return true;
   const popupAge=now-(S._popupT0||0);
@@ -4021,7 +4444,7 @@ function maybePaintLCD(now){
   if(_lcdPopupWas&&!popupVisible) _lcdDirty=true; // tempo popup has no expiry timer
   _lcdPopupWas=popupVisible;
   if(_lcdDirty){ _lcdDirty=false; paintLCD(); _lcdLast=now; return; }
-  if(powered&&lcdMode!=='off'&&lcdAnimActive(now)&&now-_lcdLast>=33){ paintLCD(); _lcdLast=now; }
+  if(powered&&lcdMode!=='off'&&lcdAnimActive(now)&&now-_lcdLast>=(perfLiteActive()?50:33)){ paintLCD(); _lcdLast=now; }
 }
 /* ---------- knobs ---------- */
 function buildKnobs(){
@@ -4446,6 +4869,8 @@ function applyTrackSound(tr,src){
   tr.machine=machine;
   tr.level=clamp(Math.round(src.level==null?100:src.level),0,127);
   tr.out=src.out==='NEIB'?'NEIB':'MAIN';
+  tr.hpTrack=src.hpTrack!==false;
+  tr.lpTrack=src.lpTrack!==false;
   tr.params=sanitizedParams(machine,src.params);
   if(Array.isArray(src._hwExtra)) tr._hwExtra=src._hwExtra.slice(0,16); else delete tr._hwExtra;
   if(typeof src._hwType==='number') tr._hwType=src._hwType; else delete tr._hwType;
@@ -4576,22 +5001,21 @@ function sanitizeTrackSound(tr,role='LEAD'){
   if(tr.machine==='GND'&&role!=='TEXTURE'){ /* silence only by explicit machine choice outside random kit */ }
 }
 function applySophieMaterial(tr,role){
-  const Sy=tr.params.SYN, A=tr.params.AMP, F=tr.params.FILT, E=tr.params.EFX;
-  // SOPHIE XE material ranges: elastic pitch envelopes, hard FM partials,
-  // bit-reduced plastic waves, tuned stereo squeaks and glossy resonance.
-  if(tr.machine==='FMDYN'){ Sy[1]=_pick([0,4,10,117,123,127]); Sy[2]=_rndi(92,127); Sy[3]=_rndi(84,127); Sy[6]=_rndi(24,96); A[2]=role==='DRUM'||role==='BASS'?_rndi(34,72):_rndi(56,104); A[4]=_rndi(76,104); }
-  else if(tr.machine==='FMPAR'){ Sy[0]=_rndi(62,112); Sy[1]=_rndi(76,124); Sy[2]=_rndi(84,124); Sy[3]=_rndi(44,96); Sy[4]=_rndi(104,127); Sy[5]=_rndi(20,72); Sy[6]=_rndi(104,127); A[2]=_rndi(64,116); }
-  else if(tr.machine==='FMSTAT'){ Sy[2]=_rndi(84,127); Sy[3]=_rndi(24,92); Sy[5]=_rndi(24,72); Sy[6]=_rndi(76,124); }
-  else if(tr.machine==='DDRW'){ Sy[4]=_rndi(28,96); Sy[6]=_rndi(18,88); Sy[5]=_rndi(76,112); A[2]=_rndi(34,76); }
-  else if(tr.machine==='DWAVE'){ Sy[2]=_rndi(44,112); E[2]=_rndi(8,44); }
-  else if(tr.machine==='VO6'){ Sy[2]=127; Sy[4]=_rndi(0,127); Sy[5]=_rndi(18,76); Sy[6]=_rndi(88,127); }
-  else if(tr.machine==='NOIS'){ Sy[0]=_rndi(88,127); Sy[1]=_rndi(12,104); Sy[2]=127; F[3]=_rndi(58,104); A[2]=_rndi(22,58); }
-  else if(tr.machine==='SID'){ Sy[1]=_rndi(64,124); Sy[4]=_pick([52,90]); E[2]=_rndi(12,48); }
-  else if(tr.machine==='BBOX'){ Sy[0]=_rndi(72,112); Sy[4]=_chance(0.4)?_rndi(24,92):0; Sy[5]=_rndi(8,72); E[2]=_rndi(0,36); }
-  if(tr.machine==='RINGMOD'){ Sy[1]=_rndi(92,127); Sy[3]=_rndi(84,124); }
-  if(tr.machine==='FLANGER'){ Sy[1]=_rndi(76,124); Sy[4]=_rndi(76,118); Sy[5]=_rndi(92,127); }
-  if(tr.machine==='REVERB'){ Sy[0]=_rndi(72,122); Sy[3]=_rndi(42,88); }
-  if(!MACH[tr.machine].fx&&_chance(0.45)) F[3]=Math.max(F[3],_rndi(48,96));
+  const candidates=MATERIAL_PATCHES.filter(p=>p.machine===tr.machine);
+  if(!candidates.length) return; // other machines keep their normal randomizer
+  const patch=_pick(candidates); applyMaterialPatch(tr,patch.id);
+  const vary=(pg,i,spread)=>{ tr.params[pg][i]=R127(tr.params[pg][i]+_rndi(-spread,spread)); };
+  // Small changes in material/decay, never arbitrary high feedback or a
+  // negative frequency-envelope extreme that erases the body of the strike.
+  if(tr.machine==='FMDYN'){ vary('SYN',1,6); vary('SYN',6,12); }
+  else if(tr.machine==='FMPAR'){ [1,3,5].forEach(i=>vary('SYN',i,5)); }
+  else if(tr.machine==='FMSTAT') vary('SYN',2,5);
+  else if(tr.machine==='DDRW'){ vary('SYN',1,16); vary('SYN',4,12); vary('SYN',6,12); }
+  else if(tr.machine==='VO6'){ vary('SYN',0,18); vary('SYN',1,18); }
+  else if(tr.machine==='NOIS'){ vary('SYN',1,14); vary('FILT',0,12); }
+  vary('AMP',2,role==='PAD'?14:8);
+  if(role==='BASS') tr.params.AMP[2]=Math.max(60,tr.params.AMP[2]);
+  if(role==='DRUM') tr.params.EFX[4]=0;
 }
 function randomizeLFOPage(tr,page,amount){
   const P=tr.params[page],defs=PAGE_DEFS[page];
@@ -4806,8 +5230,13 @@ const SHEETS={
     actBtn(r,tr.muted?'UNMUTE':'MUTE',function(){ toggleMute(i); this.textContent=tr.muted?'UNMUTE':'MUTE'; renderTracksPages(); saveSoon(); });
     actBtn(r,'OUT: '+tr.out,function(){ tr.out=tr.out==='MAIN'?'NEIB':'MAIN'; this.textContent='OUT: '+tr.out; if(AE.started)AE.applyChain(i,effParams(tr,null,i),nowT()); saveSoon(); });
     actBtn(r,'▶ AUD',()=>{ S.selTrack=i; audition(i,null,0.6); renderAll(); });
+    const kr=el('div','srow'); b.append(kr);
+    const applyKey=()=>{ if(AE.started)AE.applyChain(i,effParams(tr,null,i),nowT()); saveSoon(); };
+    actBtn(kr,'HP KEY: '+(tr.hpTrack!==false?'ON':'OFF'),function(){ tr.hpTrack=!(tr.hpTrack!==false); this.textContent='HP KEY: '+(tr.hpTrack?'ON':'OFF'); applyKey(); });
+    actBtn(kr,'LP KEY: '+(tr.lpTrack!==false?'ON':'OFF'),function(){ tr.lpTrack=!(tr.lpTrack!==false); this.textContent='LP KEY: '+(tr.lpTrack?'ON':'OFF'); applyKey(); });
   });
   b.append(el('p','snote',L('mixerNote')));
+  b.append(el('p','snote',L('mixerKeyNote')));
  },
  scale(){
   const b=sheetHead(L('scaleTitle')); const p=curPat();
@@ -4953,6 +5382,18 @@ const SHEETS={
   });
   b.append(el('p','snote',L('setupNote')));
 
+  b.append(el('div','sgroup',L('performance')));
+  const perfGrid=el('div','sgrid compact-grid'); b.append(perfGrid);
+  [['auto','perfAuto'],['lite','perfLiteBtn'],['full','perfFull']].forEach(([code,key])=>{
+    const btn=el('button','scell small'+(S.perfMode===code?' on':''),L(key)); btn.type='button';
+    bindFastTap(btn,()=>applyPerfMode(code)); perfGrid.append(btn);
+  });
+  const bootInfo=window.__monoBoot||{};
+  let perfNow=(perfLiteActive()?'LITE':'FULL')+' / '+S.perfMode.toUpperCase();
+  if(bootInfo.perf) perfNow+=' · '+bootInfo.perf;
+  if(typeof AE!=='undefined'&&AE&&AE.started) perfNow+=' · '+(AE.wasmSRR?'WASM SRR':'JS SRR')+' · '+Math.round(AE.sampleRate||(AE.ctx&&AE.ctx.sampleRate)||0)+' Hz';
+  b.append(el('p','snote',L('perfNow',{mode:perfNow})+' '+L('perfNote')));
+
   b.append(el('div','sgroup',L('settings')));
   const r=el('div','srow'); b.append(r);
   actBtn(r,'POLY MODE: '+(S.poly?'ON':'OFF'),function(){ S.poly=!S.poly; this.textContent='POLY MODE: '+(S.poly?'ON':'OFF'); showMsg(S.poly?'POLY ON':'MONO PER TRACK'); });
@@ -4971,6 +5412,18 @@ const SHEETS={
     bindFastTap(btn,()=>{ selectPattern(idx,false); closeSheet(); }); sophie.append(btn);
   });
   b.append(el('p','snote',L('sophieNote')));
+  b.append(el('div','sgroup',L('materialSounds')));
+  const materials=el('div','sgrid compact-grid'); b.append(materials);
+  MATERIAL_PATCHES.forEach(patch=>{
+    actBtn(materials,patch.name,()=>{
+      const tr=curTrk(); applyMaterialPatch(tr,patch.id);
+      refreshTrackSound(S.selTrack); S.page='SYN'; renderAll(); saveSoon();
+      if(powered&&AE.started&&!S.playing) AE.noteOn(S.selTrack,patch.note,nowT(),0.85,{len:0.85,live:true});
+      showMsg(patch.name+' · T'+(S.selTrack+1));
+    });
+  });
+  b.append(el('p','snote',L('materialNote')));
+
 
   b.append(el('div','sgroup',L('shortcuts')));
   const nav=el('div','srow'); b.append(nav);
@@ -5652,7 +6105,9 @@ async function initMIDI(manual,useSysEx=false){
 /* ---------- playhead / scope loop ---------- */
 let _lcdLast=0;
 function rafLoop(){
-  requestAnimationFrame(rafLoop);
+  const idleLite=perfLiteActive()&&!powered&&!_knobsDirty&&!_stepsDirty&&!_lcdDirty;
+  if(idleLite) setTimeout(()=>requestAnimationFrame(rafLoop),120);
+  else requestAnimationFrame(rafLoop);
   const now=performance.now();
   if(_knobsDirty) paintKnobs();
   if(_stepsDirty) paintSteps();
@@ -5695,9 +6150,9 @@ function helpHTML(){
   if(uiLang()==='en') return `
 <h3>Start in 10 seconds</h3><p><b>POWER</b> starts audio, <b>PLAY</b> starts the sequencer. Tap a trig to place a note, double-tap it for the step editor, and <b>hold a trig while turning knobs A–H</b> to write parameter locks. Drag a knob vertically; double-tap resets it. REC cycles GRID REC → LIVE REC → KEYS.</p>
 <h3>Tracks, machines and FX</h3><p>Choose T1–T6, change the machine with MACHINE, then edit SYN/AMP/FILT/EFX/LFO/ARP. An FX machine on T6 processes T5 when INP=NEIB. For a clean insert, set T5 OUT=NEIB in MIXER, put a long trig on the FX track and set AMP DEC/HOLD high. Notes on a RINGMOD track also set its carrier pitch.</p>
-<h3>SOPHIE-style material recipes</h3>
+<h3>SOPHIE-style material recipes</h3><p>These are original sound-design studies, not verified SOPHIE patches or recordings. GLOBAL → MATERIALS loads six editable recipes onto the selected track. Rubber/bubble/plastic pitch strikes use audio-clock HALF/ISAW LFO envelopes; change LFO1 DPTH and SPD to alter the impact and stretch.</p>
 <ul>
-<li><b>Elastic kick/bass — FM+DYN:</b> 1FEN at an extreme (0 or 127), 1VOL/1VEN high, 2FB 40–90, short AMP DEC. P-lock 1FEN and 2FB on different steps.</li>
+<li><b>Elastic kick/bass — FM+DYN:</b> 1FEN 70–82, 1VOL around 48, 1VEN 112, 2FB 18–42, short AMP DEC and a HALF/ISAW pitch strike. P-lock 1FEN and 2FB on different steps.</li>
 <li><b>Plastic pluck — DPRO-DDRW:</b> BR1/BR2 30–90, WID slightly wide, fast AMP/FILT decay, a little EFX SRR.</li>
 <li><b>Glass/metal — FM+PAR:</b> high 1FRQ/2FRQ/3FRQ, strong 1ENV, weaker 3ENV, TONE high, long release, then REVERB.</li>
 <li><b>Squeaks — GND-NOIS:</b> STON=ON, ST wide, resonant FILT LPQ; p-lock BASE/WDTH and RED per step.</li>
@@ -5710,9 +6165,9 @@ function helpHTML(){
   return `
 <h3>Старт за 10 секунд</h3><p><b>POWER</b> запускает звук, <b>PLAY</b> — секвенсор. Тап по тригу ставит ноту, двойной тап открывает редактор шага, а <b>удержание трига + ручки A–H</b> пишет parameter locks. Ручки тянутся вверх/вниз; двойной тап сбрасывает значение. REC переключает GRID REC → LIVE REC → KEYS.</p>
 <h3>Треки, машины и FX</h3><p>Выберите T1–T6, смените машину кнопкой MACHINE и редактируйте SYN/AMP/FILT/EFX/LFO/ARP. FX-машина на T6 обрабатывает T5 при INP=NEIB. Для чистого insert поставьте T5 OUT=NEIB в MIXER, длинный триг на FX-трек и высокие AMP DEC/HOLD. Ноты на треке RINGMOD также задают высоту его carrier.</p>
-<h3>SOPHIE-рецепты материалов</h3>
+<h3>SOPHIE-рецепты материалов</h3><p>Это авторские звуковые этюды, не подтверждённые патчи или записи SOPHIE. GLOBAL → МАТЕРИАЛЫ загружает шесть редактируемых рецептов на выбранный трек. Pitch-удары резины, пузырьков и пластика используют HALF/ISAW LFO по аудиочасам; меняйте LFO1 DPTH и SPD для силы удара и растяжения.</p>
 <ul>
-<li><b>Эластичный kick/bass — FM+DYN:</b> 1FEN в край (0 или 127), высокие 1VOL/1VEN, 2FB 40–90, короткий AMP DEC. Лочьте 1FEN и 2FB по шагам.</li>
+<li><b>Эластичный kick/bass — FM+DYN:</b> 1FEN 70–82, 1VOL около 48, 1VEN 112, 2FB 18–42, короткий AMP DEC и pitch-удар HALF/ISAW. Лочьте 1FEN и 2FB по шагам.</li>
 <li><b>Пластиковый pluck — DPRO-DDRW:</b> BR1/BR2 30–90, WID чуть шире центра, быстрые AMP/FILT decay, немного EFX SRR.</li>
 <li><b>Стекло/металл — FM+PAR:</b> высокие 1FRQ/2FRQ/3FRQ, сильный 1ENV, слабее 3ENV, TONE вверх, длинный release и REVERB.</li>
 <li><b>Писки — GND-NOIS:</b> STON=ON, широкий ST, резонансный FILT LPQ; лочьте BASE/WDTH и RED на шагах.</li>
@@ -5750,18 +6205,11 @@ async function togglePower(){
     renderAll();
   }finally{ _powerBusy=false; if(_pb){ _pb.classList.remove('busy'); _pb.removeAttribute('aria-busy'); } }
 }
-let _fitKey='';
 function fitToScreen(){
   const u=$('#unit'), w=$('#scaleWrap'); if(!u||!w) return;
-  // Never scale the whole hardware down: the responsive layout owns the size.
-  // This also stops Safari viewport changes from moving the panel while a knob is dragged.
   u.style.transform=''; w.style.height='';
-  if(document.body&&document.body.classList.contains('knob-dragging')) return;
-  const vv=window.visualViewport;
-  const vw=Math.round(vv?vv.width:window.innerWidth);
-  const vh=Math.round(vv?vv.height:window.innerHeight);
-  const key=vw+'x'+(vw>vh?'landscape':'portrait');
-  if(vh>0&&key!==_fitKey){ _fitKey=key; document.documentElement.style.setProperty('--appH',vh+'px'); }
+  // The boot guard is the sole owner of viewport height, even during a drag.
+  if(window.__monoRefreshViewport) window.__monoRefreshViewport();
 }
 function bootReport(stage,e){
   const b=window.__monoBoot; if(b) b.stage=stage;
@@ -5773,7 +6221,7 @@ function bootStage(stage,fn){
 }
 function installAudioStub(){
   if(typeof AE!=='undefined') return;
-  window.AE={ctx:null,started:false,tracks:[],uiQueue:[],lfoOff:[],workletOK:false,_stopMuted:true,
+  window.AE={ctx:null,started:false,tracks:[],uiQueue:[],lfoOff:[],workletOK:false,wasmSRR:false,perfLite:false,setPerfLite(){},_stopMuted:true,
     init:async()=>{ throw new Error(L('audioNotLoaded')); },resume:async()=>false,suspend:async()=>false,patternChanged(){},noteOn(){},noteOff(){},play(){},stop(){},
     setMachine(){},applyChain(){},killTrack(){},restoreTrack(){},allNotesOff(){},enableInput:async()=>{ throw new Error(L('audioNotLoaded')); }};
 }
@@ -5802,6 +6250,7 @@ function bootApp(){
   if(typeof AE==='undefined'){ bootReport('audio module missing',new Error(L('audioNotLoadedPanel'))); installAudioStub(); }
   bootStage('pointer fallback',installPointerFallback);
   bootStage('loadSaved',loadSaved);
+  bootStage('performance',()=>applyPerfMode(S.perfMode,{silent:true,reopen:false,noSave:true}));
   bootStage('language',applyStaticLanguage);
   bootStage('validate current pattern',()=>{ curPat(); });
   bootStage('buildStatic',buildStatic);

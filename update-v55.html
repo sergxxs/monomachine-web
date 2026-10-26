@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#211d18">
+<title>Monomachine Web V5.5.1 update</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#2b2825;color:#f2ecdc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;display:flex;align-items:center;justify-content:center;padding:calc(20px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left))}
+  main{width:min(680px,100%);background:#211d18;border:1px solid #000;box-shadow:0 12px 38px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.12);padding:22px}
+  h1{margin:0 0 10px;color:#ffb29d;font-size:22px;letter-spacing:.06em}h2{font-size:15px;margin:20px 0 8px;color:#d8d5cc}
+  p,li{line-height:1.55;font-size:15px}.small{font-size:13px;color:#c9c2b2}code{background:#10130e;padding:1px 4px;color:#cfe0bd}
+  button,a.btn{display:block;width:100%;margin:16px 0 10px;padding:15px 12px;border:1px solid #000;background:#f2ecdc;color:#211a12;font:800 16px/1.2 inherit;text-align:center;text-decoration:none;letter-spacing:.03em}
+  button:active,a.btn:active{transform:translateY(1px)}button[disabled]{opacity:.55}
+  label{display:flex;gap:10px;align-items:flex-start;margin:12px 0;line-height:1.45;font-size:14px}input{width:20px;height:20px;flex:none}
+  pre{white-space:pre-wrap;word-break:break-word;background:#10130e;color:#b7c7a8;border:1px solid #46513e;padding:12px;min-height:96px;font:12px/1.5 ui-monospace,Menlo,monospace}
+  .warn{border-left:4px solid #d84c2a;padding:8px 10px;background:rgba(216,76,42,.12)}
+</style>
+</head>
+<body>
+<main>
+  <h1 id="tTitle">MONOMACHINE WEB V5.5.1 — ОБНОВЛЕНИЕ</h1>
+  <p id="tIntro">Эта страница нужна, если iPhone/iPad показывает старую пустую панель: нет ручек DATA ENTRY, страниц, треков или тригов. Обычно это старый PWA-кэш V5.1 либо открытие файла в предпросмотре без JavaScript/Web Audio.</p>
+  <div class="warn"><b id="tImportant">Важно:</b> <span id="tWarn">открывайте опубликованную ссылку в Safari, а не из «Файлов», Telegram или Quick Look.</span></div>
+
+  <button id="go" type="button">СБРОСИТЬ СТАРЫЙ КЭШ И ОТКРЫТЬ V5.5.1</button>
+  <label><input id="factory" type="checkbox"> <span id="tFactory">Также удалить локальные паттерны/киты из localStorage на этом устройстве (обычно не нужно).</span></label>
+  <a class="btn" id="openOnly" href="index.html?monoFresh=v55">ОТКРЫТЬ V5.5.1 БЕЗ СБРОСА</a>
+
+  <h2 id="tDiag">Диагностика</h2>
+  <pre id="out">Проверка доступности JavaScript…</pre>
+  <p class="small" id="tAfter">После сброса страница сама перейдёт на index.html. Затем нажмите POWER и PLAY. Если иконка на экране «Домой» всё равно открывает старую копию, удалите иконку и добавьте её заново из Safari.</p>
+  <noscript><p><b>JavaScript is off / JavaScript выключен.</b> Enable it in Safari and open the published link again. / Включите его для Safari и откройте опубликованную ссылку ещё раз.</p></noscript>
+</main>
+<script>
+(function(){
+  var lang='ru';
+  try{ var saved=window.localStorage&&localStorage.getItem('monomachine_lang'); if(saved==='en'||saved==='ru') lang=saved; else if(/^en\b/i.test(navigator.language||'')) lang='en'; }catch(e){}
+  document.documentElement.lang=lang;
+  var T={
+    ru:{title:'MONOMACHINE WEB V5.5.1 — ОБНОВЛЕНИЕ',intro:'Эта страница нужна, если iPhone/iPad показывает старую пустую панель: нет ручек DATA ENTRY, страниц, треков или тригов. Обычно это старый PWA-кэш V5.1 либо открытие файла в предпросмотре без JavaScript/Web Audio.',important:'Важно:',warn:'открывайте опубликованную ссылку в Safari, а не из «Файлов», Telegram или Quick Look.',go:'СБРОСИТЬ СТАРЫЙ КЭШ И ОТКРЫТЬ V5.5.1',factory:'Также удалить локальные паттерны/киты из localStorage на этом устройстве (обычно не нужно).',openOnly:'ОТКРЫТЬ V5.5.1 БЕЗ СБРОСА',diag:'Диагностика',after:'После сброса страница сама перейдёт на index.html. Затем нажмите POWER и PLAY. Если иконка на экране «Домой» всё равно открывает старую копию, удалите иконку и добавьте её заново из Safari.',screen:'Экран',caches:'Кэши',none:'нет',error:'ошибка',unavailable:'Cache Storage / Service Worker недоступны в этом контексте.',resetting:'Сбрасываю старый кэш…',localDeleted:'Локальные сохранения удалены.',swOff:'Service workers отключены.',cacheDeleted:'Кэши Monomachine удалены.',resetError:'Ошибка сброса',opening:'Открываю свежую V5.5.1…'},
+    en:{title:'MONOMACHINE WEB V5.5.1 — UPDATE',intro:'Use this page if an iPhone/iPad shows an old empty panel: no DATA ENTRY knobs, pages, tracks or trigs. This is usually a stale V5.1 PWA cache, or the file was opened in a preview without JavaScript/Web Audio.',important:'Important:',warn:'open the published link in Safari, not from Files, Telegram or Quick Look.',go:'RESET OLD CACHE AND OPEN V5.5.1',factory:'Also delete local patterns/kits from localStorage on this device (usually unnecessary).',openOnly:'OPEN V5.5.1 WITHOUT RESET',diag:'Diagnostics',after:'After the reset this page opens index.html automatically. Then tap POWER and PLAY. If a Home Screen icon still opens the old copy, delete the icon and add it again from Safari.',screen:'Screen',caches:'Caches',none:'none',error:'error',unavailable:'Cache Storage / Service Worker are unavailable in this context.',resetting:'Resetting the old cache…',localDeleted:'Local saves deleted.',swOff:'Service workers unregistered.',cacheDeleted:'Monomachine caches deleted.',resetError:'Reset error',opening:'Opening fresh V5.5.1…'}
+  };
+  function t(k){ return T[lang][k]||T.ru[k]||k; }
+  function set(id,key){ var e=document.getElementById(id); if(e) e.textContent=t(key); }
+  set('tTitle','title'); set('tIntro','intro'); set('tImportant','important'); set('tWarn','warn'); set('tFactory','factory'); set('tDiag','diag'); set('tAfter','after');
+  var out=document.getElementById('out');
+  var btn=document.getElementById('go'); btn.textContent=t('go');
+  var openOnly=document.getElementById('openOnly'); openOnly.textContent=t('openOnly');
+  function line(s){ out.textContent += '\n' + s; }
+  function describe(){
+    out.textContent='JavaScript: OK\nURL: '+location.href+'\n'+t('screen')+': '+window.innerWidth+'x'+window.innerHeight;
+    var jobs=[];
+    if(window.caches&&caches.keys) jobs.push(caches.keys().then(function(ks){ line(t('caches')+': '+(ks.length?ks.join(', '):t('none'))); }).catch(function(e){ line(t('caches')+': '+t('error')+' '+e); }));
+    if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations) jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){ line('Service workers: '+rs.length); }).catch(function(e){ line('Service workers: '+t('error')+' '+e); }));
+    if(!jobs.length) line(t('unavailable'));
+  }
+  function go(){
+    btn.disabled=true;
+    line('\n'+t('resetting'));
+    var jobs=[];
+    try{
+      if(document.getElementById('factory').checked){
+        localStorage.removeItem('monomachine_web_v1');
+        line(t('localDeleted'));
+      }
+      if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations){
+        jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){
+          return Promise.all(rs.map(function(r){ return r.unregister(); }));
+        }).then(function(){ line(t('swOff')); }));
+      }
+      if(window.caches&&caches.keys){
+        jobs.push(caches.keys().then(function(ks){
+          return Promise.all(ks.filter(function(k){ return k.indexOf('mono-web-')===0; }).map(function(k){ return caches.delete(k); }));
+        }).then(function(){ line(t('cacheDeleted')); }));
+      }
+    }catch(e){ line(t('resetError')+': '+e); }
+    function open(){
+      line(t('opening'));
+      setTimeout(function(){ location.replace('index.html?monoFresh='+Date.now()); },250);
+    }
+    if(window.Promise&&jobs.length) Promise.all(jobs).then(open,open); else open();
+  }
+  btn.onclick=go;
+  describe();
+})();
+</script>
+</body>
+</html>
