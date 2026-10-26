@@ -5,7 +5,7 @@
 // exists at the old /sw.js URL so an already-installed V5.1/V5.2 worker can
 // update to it, delete its stale Monomachine caches and stop controlling the
 // site. It never caches the app itself.
-const VERSION = 'mono-web-v5.5.0-onefile-rescue';
+const VERSION = 'mono-web-v5.5.1-onefile-rescue';
 
 self.addEventListener('install', e => {
   e.waitUntil(self.skipWaiting());
